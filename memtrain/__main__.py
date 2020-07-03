@@ -1,6 +1,35 @@
 import argparse
 import csv
 
+# Settings ####################################################################
+
+## Boolean settings
+
+### Levels
+
+# Level 1 - Multiple choice questions
+level1 = True
+# Level 2 - Use a hint to respond
+level2 = True
+# Level 3 - Respond on your own
+level3 = True
+
+### Alias
+
+# Alias
+alias = True
+
+
+
+# nquestions - Number of questions
+nquestions = 0
+
+title = ''
+
+def lowercase_row(row):
+    '''Make every string in a row lowercase'''
+    return map(lambda x: x.lower(), row)
+
 def load(csvfile):
     '''Load the CSV file'''
     out = []
@@ -15,6 +44,12 @@ def load(csvfile):
 def train(args):
     '''Begin training'''
     database = load(args.csvfile)
+
+    for row in database:
+        if sum(row) == 1:
+            if lowercase_row(row[0]).startswith('settings:')
+
+
     print(database)
 
 ###############################################################################
