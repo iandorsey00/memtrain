@@ -1,5 +1,12 @@
 import argparse
 import csv
+import random
+import decimal
+import time
+from datetime import timedelta
+from statistics import mean
+
+import os
 
 # SettingError ################################################################
 class SettingError(Exception):
@@ -104,6 +111,7 @@ def load(csvfile):
 
     return out
 
+
 def train(args):
     '''Begin training'''
     # Initialize settings and database
@@ -147,7 +155,95 @@ def train(args):
         response = row[indicies['response']]
         cr_database.append([cue, response])
 
-    print(cr_database)
+    # Get responses and aliases
+    responses = [i[1] for i in cr_database]
+    aliases = dict()
+
+    if settings.settings['alias']:
+        unique_responses = list(set(responses))
+        for unique_response in unique_responses:
+            lc_unique_response = unique_response.lower()
+            level = 1
+            complete = False
+            while not complete:
+                proposed_key = lc_unique_response[:level]
+                if proposed_key not in aliases.keys():
+                    aliases[proposed_key] = unique_response
+                    level = 1
+                    complete = True
+                else:
+                    get_key = aliases.pop(proposed_key)
+                    level = level + 1
+                    aliases[get_key[:level].lower()] = get_key
+
+    # Main training program ###################################################
+    # List of times
+    times = []
+
+    # Inter-area margin for printing purposes
+    iam = ' '
+
+    # If nquestions is not 0, add necessary questions to cr_database.
+    nquestions = settings.settings['nquestions']
+
+    if nquestions is not 0:
+        total = len(cr_database)
+        add = nquestions - total
+        new_cr_database = list(cr_database)
+
+        for i in range(add):
+            new_cr_database.append(random.choice(cr_database))
+        
+        cr_database = list(new_cr_database)
+
+    # Shuffle database
+    random.shuffle(cr_database)
+
+    # Initialize statistics
+    correct = 0
+    incorrect = 0
+    question_number = 1
+    total = len(cr_database)
+
+    # Prompts
+    for cue, response in cr_database:
+        if question_number is not 1:
+            percentage = decimal.Decimal(correct) / decimal.Decimal(question_number-1) * decimal.Decimal(100)
+
+        print(settings.settings['title'].ljust(29) + iam + 'Cue ' + str(question_number) + '/' + str(total))
+        if question_number is not 1:
+            print('Correct so far'.ljust(29) + iam + str(correct) + '/' + str(question_number-1) + ' (' + str(round(percentage, 1)) + '%)')
+        print()
+        print('    ' + cue)
+        print()
+        start = time.time()
+        answer = input('Enter response: ')
+        end = time.time()
+        elasped_time = end - start
+        times.append(elasped_time)
+        print()
+        os.system('clear')
+
+        if response == answer or response == aliases[answer]:
+            print('Correct.')
+            correct = correct + 1
+        else:
+            print('Incorrect. Answer: ' + response)
+            incorrect = incorrect + 1
+        print()
+        question_number = question_number + 1 
+
+    # Print statistics ########################################################
+    decimal.getcontext().prec = 5
+    percentage = decimal.Decimal(correct) / decimal.Decimal(total) * decimal.Decimal(100)
+
+    print(settings.settings['title'])
+    print()
+    print('Training session complete.')
+    print()
+    print('Correct: ' + str(correct) + '/' + str(total) + ' (' + str(round(percentage, 1)) + '%)')
+    print('Average response time: ' + str(timedelta(seconds=mean(times))))
+    print()
 
 ###############################################################################
 # Argument parsing with argparse
