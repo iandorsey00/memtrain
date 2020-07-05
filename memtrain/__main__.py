@@ -17,7 +17,7 @@ class SettingError(Exception):
     pass
 
 # NoCueError ##################################################################
-class NoCueError(Exception):
+class NoCuesError(Exception):
     pass
 
 # Settings ####################################################################
@@ -134,21 +134,6 @@ def train(args):
 
     header_row = 0
 
-    # Set level, if one was specified:
-    if args.level:
-        if args.level == 1:
-            settings.settings['level1'] = True
-            settings.settings['level2'] = False
-            settings.settings['level3'] = False
-        elif args.level == 2:
-            settings.settings['level1'] = False
-            settings.settings['level2'] = True
-            settings.settings['level3'] = False
-        elif args.level == '3':
-            settings.settings['level1'] = False
-            settings.settings['level2'] = False
-            settings.settings['level3'] = True
-
     for row_number, row in enumerate(database):
         # Only one non-empty string in row
         if len([item for item in row if len(item) > 0]) == 1:
@@ -164,30 +149,64 @@ def train(args):
                 settings.set_title(row)
 
         else:
+            # Lowercase the row, because this row is supposed to be case-insensitive
             this_row = lowercase_row(row)
             
+            # If a row contains 'Cue' and 'Response', it is designated as the column header row.
             if 'cue' in this_row and 'response' in this_row:
                 indicies['cue'] = this_row.index('cue')
                 indicies['response'] = this_row.index('response')
+                indicies['hint'] = [index for index, element in enumerate(this_row) if element == 'hint']
                 indicies['tag'] = [index for index, element in enumerate(this_row) if element == 'tag']
                 indicies['mtag'] = [index for index, element in enumerate(this_row) if element == 'mtag']
                 header_row = row_number
             
+            # Now that we've scanned the column header row, we are done scanning for settings.
             break
 
-    # Read cue/response pairs, tags, and mtags
+    # Now, parse command line settings. #######################################
+
+    # Set level, if one was specified:
+    if args.level:
+        if args.level == '1':
+            settings.settings['level1'] = True
+            settings.settings['level2'] = False
+            settings.settings['level3'] = False
+        elif args.level == '2':
+            settings.settings['level1'] = False
+            settings.settings['level2'] = True
+            settings.settings['level3'] = False
+        elif args.level == '3':
+            settings.settings['level1'] = False
+            settings.settings['level2'] = False
+            settings.settings['level3'] = True
+        else:
+            raise SettingError('Invalid level specified.')
+
+    # Get nquestions if specified on the command line.
+    if args.nquestions:
+        if args.nquestions < 0:
+            raise SettingError('Invalid number of questions specified.')
+        else:
+            settings.settings['nquestions'] = args.nquestions
+
+    # Read cue/response pairs, hints, tags, and mtags
     for row_number, row in enumerate(database[header_row + 1:]):
         cue = row[indicies['cue']]
         response = row[indicies['response']]
+        hints = []
         tags = []
         mtags = []
+        for index in indicies['hint']:
+            hints.append(row[index])
         for index in indicies['tag']:
             tags.append(row[index])
         for index in indicies['mtag']:
             mtags.append(row[index])
-        cr_database.append({'cue': cue, 'response': response, 'tags': tags,
-        'mtags': mtags})
+        cr_database.append({'cue': cue, 'response': response, 'hints': hints,
+        'tags': tags, 'mtags': mtags})
 
+    # Filter out other tags if they were specified on the command line.
     if args.tags:
         args_tags = args.tags.split(',')
         cr_database = [row for row in cr_database if not set(args_tags).isdisjoint(row['tags'])]
@@ -207,6 +226,7 @@ def train(args):
     responses = [i['response'] for i in cr_database]
     aliases = dict()
 
+    # Map aliases to responses
     if settings.settings['alias']:
         unique_responses = list(set(responses))
         for unique_response in unique_responses:
@@ -236,13 +256,29 @@ def train(args):
 
     if nquestions is not 0:
         total = len(cr_database)
-        add = nquestions - total
-        new_cr_database = list(cr_database)
 
-        for i in range(add):
-            new_cr_database.append(random.choice(cr_database))
-        
-        cr_database = list(new_cr_database)
+        # If nquestions is greater than the total number of questions,
+        # duplicate them at random until nquestions is reached.
+        if nquestions > total:
+            add = nquestions - total
+            new_cr_database = list(cr_database)
+
+            for i in range(add):
+                new_cr_database.append(random.choice(cr_database))
+            
+            cr_database = list(new_cr_database)
+        # If nquestions is less than the total number of questions, choose the
+        # questions at random until we have another.
+        elif nquestions < total:
+            new_cr_database = list(cr_database)
+            random.shuffle(new_cr_database)
+            cr_database_container = []
+            for i in range(nquestions):
+                cr_database_container.append(new_cr_database[i])
+            
+            cr_database = list(cr_database_container)
+        # If nquestions is equal to the total number of questions, don't do
+        # anything.
 
     # Shuffle database
     random.shuffle(cr_database)
@@ -253,17 +289,22 @@ def train(args):
     question_number = 1
     total = len(cr_database)
 
+    # Raise NoCuesError if there are no cues available.
+    if total == 0:
+        raise NoCuesError('There are no cues available that match the criteria.')
+
     # Prompts #################################################################
     for this_dict in cr_database:
         cue = this_dict['cue']
         response = this_dict['response']
+        hints = this_dict['hints']
         mtags = this_dict['mtags']
         # Get number of mtags
         n_mtags = len(mtags)
 
         # Format the cue
         f_cue = cue.replace('{{}}', '_________')
-        f_cue = textwrap.fill(f_cue, initial_indent='    ', subsequent_indent='    ', width=80)
+        f_cue = textwrap.fill(f_cue, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
 
         # Print how questions were answered correctly so far if we are not on
         # the first question.
@@ -338,6 +379,15 @@ def train(args):
                 print((i + ')').ljust(5) + iam + this_response)
 
             print()
+        
+        elif settings.settings['level2']:
+            for hint in hints:
+                # Print hint only if it is not empty.
+                if len(hint) != 0:
+                    # Format hint to match cue.
+                    f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
+                    print(f_hint)
+                    print()
 
         # Start time
         start = time.time()
@@ -352,14 +402,18 @@ def train(args):
         # Clear screen.
         os.system('clear')
 
+        # Validate input.
         if settings.settings['level1']:
+            # For level 1, check to see if the right letter was entered.
             correct_user_input = correct_letter == user_input
-        elif settings.settings['level3']:
+        elif settings.settings['level2'] or settings.settings['level3']:
+            # For levels 2 or 3, make sure the right alias was entered.
             if user_input in aliases.keys():
                 correct_user_input = response.lower() == user_input.lower() or response == aliases[user_input.lower()]
             else:
                 correct_user_input = response.lower() == user_input.lower()
 
+        # Perform actions based on correctness.
         if correct_user_input:
             print('Correct.')
             correct = correct + 1
@@ -393,6 +447,7 @@ parser.set_defaults(func=train)
 # Create arguments
 parser.add_argument('-t', '--tags', help='Study these tags only')
 parser.add_argument('-l', '--level', help='Specify which level to study')
+parser.add_argument('-n', '--nquestions', type=int, help='Set the number of quesitions for this session')
 parser.add_argument('csvfile', help='The CSV file to load')
 
 # Parse arguments
