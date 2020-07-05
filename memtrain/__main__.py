@@ -10,6 +10,8 @@ from statistics import mean
 
 import os
 
+version = '0.1a'
+
 # SettingError ################################################################
 class SettingError(Exception):
     pass
@@ -268,6 +270,21 @@ def train(args):
         if question_number is not 1:
             percentage = decimal.Decimal(correct) / decimal.Decimal(question_number-1) * decimal.Decimal(100)
 
+        # Determine the level
+        if settings.settings['level1']:
+            level = 'Level 1'
+        elif settings.settings['level2']:
+            level = 'Level 2'
+        elif settings.settings['level3']:
+            level = 'Level 3'
+
+        def print_header():
+            # Print the program header.
+            print(('memtrain '+ version).ljust(69) + iam + level.rjust(10))
+            print()
+
+        print_header()
+
         # Print first two rows and the cue.
         print(settings.settings['title'].ljust(69) + iam + ('Cue ' + str(question_number) + '/' + str(total)).rjust(10))
         if question_number is not 1:
@@ -278,50 +295,47 @@ def train(args):
 
         # If on level one, generate the multiple choice questions.
         if settings.settings['level1']:
-            # First, make copies of sets of responses for each mtag.
-            response_copies_by_mtag = dict()
-
+            # Get responses for all mtags
+            response_pool = []
             for mtag in mtags:
-                # Delete the correct reponse
-                response_copies_by_mtag[mtag] = [i for i in mtag_list[mtag] if i is not response]
+                response_pool += mtag_list[mtag]
+            # Shuffle responses
+            random.shuffle(response_pool)
+            # Get all responses, in case we run out
+            all_responses = list(responses)
+            random.shuffle(all_responses)
+            # Make sure the correct answer is removed from both response_pool and all_responses
+            response_pool = [i for i in response_pool if i != response]
+            all_responses = [i for i in all_responses if i != response]
 
-            # How many multiple choices will there be?
+            # Get our ascii range for the multiple choice questions
             ascii_range = string.ascii_lowercase[:4]
-            
-            # Select the index for the correct choice at random.
-            correct_index = random.choice(ascii_range)
+            # Get the index of the correct answer.
+            correct_letter = random.choice(ascii_range)
 
-            # Now, for each choice, print the response.
+            # Loop through the ascii range
             for i in ascii_range:
-                # Reset and shuffle copied data.
-                these_response_copies_by_mtag = dict(response_copies_by_mtag)
-                for key in response_copies_by_mtag.keys():
-                    random.shuffle(response_copies_by_mtag[key])
-                these_mtags = list(mtags)
-                random.shuffle(these_mtags)
-                # If i is the correct_index, print the correct response
-                if i == correct_index:
-                    # Print the capitalized correct response.
-                    print((i + ')').ljust(5) + iam + response.capitalize())
-                # Otherwise, select an incorrect response at random.
+                # If we have the correct letter, output the correct response.
+                if i == correct_letter:
+                    this_response = response
+                # Otherwise...
                 else:
-                    this_mtag = random.choice(these_mtags)
-                    # If there are no more mtags for this_mtag, delete it from
-                    # these_mtags.
-                    while len(these_response_copies_by_mtag[this_mtag]) == 0:
-                        these_mtags.remove(this_mtag)
-                        # If these_mtags is empty, just choose a random mtag.
-                        if len(these_mtags) == 0:
-                            this_mtag = random.choice(list(mtag_list.keys()))
-                            these_response_copies_by_mtag[this_mtag] = [i for i in mtag_list[this_mtag] if i is not response]
-                    # Get a random response.
-                    this_response = these_response_copies_by_mtag[this_mtag].pop()
-                    # If the response is the same as the correct response,
-                    # get another one.
-                    while this_response == response:
-                        this_response = these_response_copies_by_mtag[this_mtag].pop()
-                    # Print the capitalized response
-                    print((i + ')').ljust(5) + iam + this_response.capitalize())
+                    # If the response_pool is empty...
+                    if len(response_pool) == 0:
+                        # Pop a response from all responses
+                        this_response = all_responses.pop()
+                        # Remove that response (in case there's a duplicate)
+                        all_responses = [i for i in all_responses if not i.lower() == this_response.lower()]
+                    # If the response_pool is not empty...
+                    else:
+                        # Pop a response from the response pool
+                        this_response = response_pool.pop()
+                        # Remove that response (in case there's a duplicate)
+                        response_pool = [i for i in response_pool if not i.lower() == this_response.lower()]
+                # Capitalize only the first letter of this_response
+                this_response = this_response[0].upper() + this_response[1:]
+                # Now that we have our response, print it
+                print((i + ')').ljust(5) + iam + this_response)
 
             print()
 
@@ -339,7 +353,7 @@ def train(args):
         os.system('clear')
 
         if settings.settings['level1']:
-            correct_user_input = correct_index == user_input
+            correct_user_input = correct_letter == user_input
         elif settings.settings['level3']:
             if user_input in aliases.keys():
                 correct_user_input = response.lower() == user_input.lower() or response == aliases[user_input.lower()]
@@ -359,6 +373,7 @@ def train(args):
     decimal.getcontext().prec = 5
     percentage = decimal.Decimal(correct) / decimal.Decimal(total) * decimal.Decimal(100)
 
+    print_header()
     print(settings.settings['title'])
     print()
     print('Training session complete.')
