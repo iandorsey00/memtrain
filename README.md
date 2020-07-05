@@ -17,4 +17,4 @@ With memtrain, the user need only create a CSV containing cues and responses.
 memtrain does the rest automatically, including generation of multiple choice
 questions.
 
-Documentation is available on the [Wiki https://github.com/iandorsey00/memtrain/wiki].
+Documentation is available on the [Wiki](https://github.com/iandorsey00/memtrain/wiki).
