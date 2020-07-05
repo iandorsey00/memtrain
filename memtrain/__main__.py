@@ -169,17 +169,26 @@ def train(args):
     # Set level, if one was specified:
     if args.level:
         if args.level == '1':
-            settings.settings['level1'] = True
-            settings.settings['level2'] = False
-            settings.settings['level3'] = False
+            if settings.settings['level1'] == False:
+                raise SettingError('Level 1 functionality has been disabled for this CSV.')
+            else:
+                settings.settings['level1'] = True
+                settings.settings['level2'] = False
+                settings.settings['level3'] = False
         elif args.level == '2':
-            settings.settings['level1'] = False
-            settings.settings['level2'] = True
-            settings.settings['level3'] = False
+            if settings.settings['level2'] == False:
+                raise SettingError('Level 2 functionality has been disabled for this CSV.')
+            else:
+                settings.settings['level1'] = False
+                settings.settings['level2'] = True
+                settings.settings['level3'] = False
         elif args.level == '3':
-            settings.settings['level1'] = False
-            settings.settings['level2'] = False
-            settings.settings['level3'] = True
+            if settings.settings['level3'] == False:
+                raise SettingError('Level 3 functionality has been disabled for this CSV.')
+            else:
+                settings.settings['level1'] = False
+                settings.settings['level2'] = False
+                settings.settings['level3'] = True
         else:
             raise SettingError('Invalid level specified.')
 
@@ -447,7 +456,7 @@ parser.set_defaults(func=train)
 # Create arguments
 parser.add_argument('-t', '--tags', help='Study these tags only')
 parser.add_argument('-l', '--level', help='Specify which level to study')
-parser.add_argument('-n', '--nquestions', type=int, help='Set the number of quesitions for this session')
+parser.add_argument('-n', '--nquestions', type=int, help='Set the number of questions for this session')
 parser.add_argument('csvfile', help='The CSV file to load')
 
 # Parse arguments
