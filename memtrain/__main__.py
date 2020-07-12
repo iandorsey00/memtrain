@@ -17,8 +17,8 @@ version = '0.2a'
 class SettingError(Exception):
     pass
 
-# NoCueError ##################################################################
-class NoCuesError(Exception):
+# NoResponsesError ############################################################
+class NoResponsesError(Exception):
     pass
 
 # CSVError ####################################################################
@@ -194,12 +194,7 @@ def get_csv_column_indices(indices, csv_list):
             indices['hint'] += get_index(this_row, 'hint3')
 
             indices['tag'] = get_indices(this_row, 'tag')
-            indices['tag'] += get_index(this_row, 'tag2')
-            indices['tag'] += get_index(this_row, 'tag3')
-
             indices['mtag'] = get_indices(this_row, 'mtag')
-            indices['mtag'] += get_index(this_row, 'mtag2')
-            indices['mtag'] += get_index(this_row, 'mtag3')
 
             # We're done after the header row.
             break
@@ -433,14 +428,25 @@ def train(args):
     # Save changes
     conn.commit()
 
-    # Debug
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM responses_to_mtags")
+    # Helper methods ##########################################################
+    def memtrain_query(columns, tables):
+        curr = conn.cursor()
+        curr.execute('''SELECT {} FROM {}'''.format(columns, tables))
+        rows = curr.fetchall()
+        columns = len(columns.split(','))
+        if columns == 1:
+            rows = list(map(lambda x: x[0], rows))
 
-    rows = cur.fetchall()
+        return rows
 
-    for row in rows:
-        print(row)
+    def get_all_responses():
+        return memtrain_query('response', 'responses')
+
+    def get_all_response_ids():
+        return memtrain_query('response_id', 'responses')
+
+    def get_all_cue_response_id_pairs():
+        return memtrain_query('cue_id, response_id', 'cues_to_responses')
 
     # Now, parse command line settings. #######################################
 
@@ -477,40 +483,13 @@ def train(args):
         else:
             settings.settings['nquestions'] = args.nquestions
 
-    # Read cue/response pairs, hints, tags, and mtags
-    for row_number, row in enumerate(database[header_row + 1:]):
-        cue = row[indices['cue']]
-        response = row[indices['response']]
-        hints = []
-        tags = []
-        mtags = []
-        for index in indices['hint']:
-            hints.append(row[index])
-        for index in indices['tag']:
-            tags.append(row[index])
-        for index in indices['mtag']:
-            mtags.append(row[index])
-        cr_database.append({'cue': cue, 'response': response, 'hints': hints,
-        'tags': tags, 'mtags': mtags})
-
     # Filter out other tags if they were specified on the command line.
     if args.tags:
         args_tags = args.tags.split(',')
         cr_database = [row for row in cr_database if not set(args_tags).isdisjoint(row['tags'])]
 
-    # Map mtags to responses
-    mtag_list = dict()
-    for row in cr_database:
-        these_mtags = row['mtags']
-        for this_mtag in these_mtags:
-            response = row['response']
-            if this_mtag not in mtag_list.keys():
-                mtag_list[this_mtag] = [response]
-            else:
-                mtag_list[this_mtag].append(response)
-
     # Get responses and aliases
-    responses = [i['response'] for i in cr_database]
+    responses = get_all_responses()
     aliases = dict()
 
     # Map aliases to responses
@@ -532,60 +511,87 @@ def train(args):
                     aliases[get_key[:level].lower()] = get_key
 
     # Main training program ###################################################
+    cr_id_pairs = get_all_cue_response_id_pairs()
+
     # List of times
     times = []
 
     # Inter-area margin for printing purposes
     iam = ' '
 
-    # If nquestions is not 0, add necessary questions to cr_database.
+    # If nquestions is not 0, add necessary responses or remove responses.
     nquestions = settings.settings['nquestions']
 
     if nquestions is not 0:
-        total = len(cr_database)
+        total = len(cr_id_pairs)
 
         # If nquestions is greater than the total number of questions,
         # duplicate them at random until nquestions is reached.
         if nquestions > total:
             add = nquestions - total
-            new_cr_database = list(cr_database)
+            new_cr_id_pairs = list(cr_id_pairs)
 
             for i in range(add):
-                new_cr_database.append(random.choice(cr_database))
+                new_response_ids.append(random.choice(cr_id_pairs))
             
-            cr_database = list(new_cr_database)
+            cr_id_pairs = list(new_cr_id_pairs)
         # If nquestions is less than the total number of questions, choose the
         # questions at random until we have another.
         elif nquestions < total:
-            new_cr_database = list(cr_database)
-            random.shuffle(new_cr_database)
-            cr_database_container = []
+            random.shuffle(cr_id_pairs)
+            new_cr_id_pairs= []
             for i in range(nquestions):
-                cr_database_container.append(new_cr_database[i])
+                new_cr_id_pairs.append(cr_id_pairs[i])
             
-            cr_database = list(cr_database_container)
+            cr_id_pairs = list(new_cr_id_pairs)
         # If nquestions is equal to the total number of questions, don't do
         # anything.
 
     # Shuffle database
-    random.shuffle(cr_database)
+    random.shuffle(cr_id_pairs)
 
     # Initialize statistics
     correct = 0
     incorrect = 0
-    question_number = 1
-    total = len(cr_database)
+    response_number = 1
+    total = len(cr_id_pairs)
 
-    # Raise NoCuesError if there are no cues available.
+    # Raise NoResponsesError if there are no responses available.
     if total == 0:
-        raise NoCuesError('There are no cues available that match the criteria.')
+        raise NoResponsesError('There are no cues available that match the criteria.')
+
+    # Prompt helper methods ###################################################
+    curr = conn.cursor()
+
+    def memtrain_get_value(value, value_id):
+        curr.execute('''SELECT {} FROM {} WHERE {} = (?)'''.format(value, value + 's', value + '_id'), (str(value_id), ))
+        rows = curr.fetchall()
+        return rows[0][0]
+
+    def get_cue(cue_id):
+        return memtrain_get_value('cue', cue_id)
+
+    def get_response(response_id):
+        return memtrain_get_value('response', response_id)
+
+    def get_mtags(response_id):
+        curr.execute('''SELECT mtag_id FROM responses_to_mtags WHERE response_id = (?)''', (str(response_id), ))
+        rows = curr.fetchall()
+        rows = list(map(lambda x: x[0], rows))
+
+        out = []
+
+        for mtag_id in rows:
+            out.append(memtrain_get_value('mtag', mtag_id))
+
+        return out
 
     # Prompts #################################################################
-    for this_dict in cr_database:
-        cue = this_dict['cue']
-        response = this_dict['response']
-        hints = this_dict['hints']
-        mtags = this_dict['mtags']
+    for cue_id, response_id in cr_id_pairs:
+        cue = get_cue(cue_id)
+        response = get_response(response_id)
+        # hints = response_id_to_hints(response_id)
+        mtags = get_mtags(response_id)
         # Get number of mtags
         n_mtags = len(mtags)
 
@@ -595,8 +601,8 @@ def train(args):
 
         # Print how questions were answered correctly so far if we are not on
         # the first question.
-        if question_number is not 1:
-            percentage = decimal.Decimal(correct) / decimal.Decimal(question_number-1) * decimal.Decimal(100)
+        if response_number is not 1:
+            percentage = decimal.Decimal(correct) / decimal.Decimal(response_number-1) * decimal.Decimal(100)
 
         # Determine the level
         if settings.settings['level1']:
@@ -614,9 +620,9 @@ def train(args):
         print_header()
 
         # Print first two rows and the cue.
-        print(settings.settings['title'].ljust(69) + iam + ('Response ' + str(question_number) + '/' + str(total)).rjust(10))
-        if question_number is not 1:
-            print('Correct so far'.ljust(59) + iam + (str(correct) + '/' + str(question_number-1) + ' (' + str(round(percentage, 1)) + '%)').rjust(20))
+        print(settings.settings['title'].ljust(69) + iam + ('Response ' + str(response_number) + '/' + str(total)).rjust(10))
+        if response_number is not 1:
+            print('Correct so far'.ljust(59) + iam + (str(correct) + '/' + str(response_number-1) + ' (' + str(round(percentage, 1)) + '%)').rjust(20))
         print()
         print(f_cue)
         print()
@@ -708,7 +714,7 @@ def train(args):
             print('Incorrect. Answer: ' + response)
             incorrect = incorrect + 1
         print()
-        question_number = question_number + 1 
+        response_number = response_number + 1 
 
     # Print statistics ########################################################
     decimal.getcontext().prec = 5
