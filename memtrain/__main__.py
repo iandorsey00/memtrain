@@ -5,12 +5,13 @@ import decimal
 import time
 import string
 import textwrap
+import sqlite3
 from datetime import timedelta
 from statistics import mean
 
 import os
 
-version = '0.1a'
+version = '0.2a'
 
 # SettingError ################################################################
 class SettingError(Exception):
@@ -18,6 +19,10 @@ class SettingError(Exception):
 
 # NoCueError ##################################################################
 class NoCuesError(Exception):
+    pass
+
+# CSVError ####################################################################
+class CSVError(Exception):
     pass
 
 # Settings ####################################################################
@@ -104,9 +109,12 @@ class MtSettings:
         for label in self.all_labels:
             print(label.ljust(20) + str(self.settings[label]).ljust(20))
 
-def lowercase_row(row):
-    '''Make every string in a row lowercase'''
-    return list(map(lambda x: x.lower(), row))
+def normalize_row(row):
+    '''Make every string in a row lowercase and remove all whitespace'''
+    # Lowercase row
+    out = list(map(lambda x: x.lower(), row))
+    # Remove whitespace from row and return
+    return list(map(lambda x: ''.join(x.split()), out))
 
 def load(csvfile):
     '''Load the CSV file'''
@@ -119,25 +127,37 @@ def load(csvfile):
 
     return out
 
+def get_indicies(row, target_str):
+    '''Get all indices for target_str in a row'''
+    return [index for index, element in enumerate(row) if element == target_str]
 
-def train(args):
-    '''Begin training'''
-    # Initialize settings and database
-    database = load(args.csvfile)
-    cr_database = []
-    settings = MtSettings()
+def get_index(row, target_str):
+    '''Get the first index for target_str in a row.'''
+    index = get_indicies(row, target_str)[:1]
+    return index
 
-    indicies = dict()
-    indicies['cue'] = -1
-    indicies['response'] = -1
-    indicies['mtag'] = []
+def get_index_mandatory(row, target_str):
+    '''
+    Get a mandatory index for target_str in a row. It is an error if it doesn't
+    exist.
+    '''
+    index = get_index(row, target_str)
 
-    header_row = 0
+    if len(index) < 1:
+        raise CSVError('The mandatory column {} is missing.', target_str)
+    
+    return index
 
-    for row_number, row in enumerate(database):
+def is_header_row(row):
+    '''Determine whether the current row is the header row'''
+    return 'cue' in row and 'response' in row
+
+def set_csv_settings(settings, csv_list):
+    '''Set CSV settings'''
+    for row in csv_list:
         # Only one non-empty string in row
         if len([item for item in row if len(item) > 0]) == 1:
-            settings_str = lowercase_row(row)[0]
+            settings_str = normalize_row(row)[0]
 
             # If it begins with settings: or Settings:, it's the settings
             # string
@@ -147,22 +167,128 @@ def train(args):
             # Otherwise, it's the title row
             else:
                 settings.set_title(row)
-
-        else:
-            # Lowercase the row, because this row is supposed to be case-insensitive
-            this_row = lowercase_row(row)
-            
-            # If a row contains 'Cue' and 'Response', it is designated as the column header row.
-            if 'cue' in this_row and 'response' in this_row:
-                indicies['cue'] = this_row.index('cue')
-                indicies['response'] = this_row.index('response')
-                indicies['hint'] = [index for index, element in enumerate(this_row) if element == 'hint']
-                indicies['tag'] = [index for index, element in enumerate(this_row) if element == 'tag']
-                indicies['mtag'] = [index for index, element in enumerate(this_row) if element == 'mtag']
-                header_row = row_number
-            
-            # Now that we've scanned the column header row, we are done scanning for settings.
+        
+        # Stop if there is more than one non-empty string
+        elif len([item for item in row if len(item) > 0]) > 1:
             break
+
+def get_csv_column_indices(indicies, csv_list):
+    '''Get column indicies for database processing'''
+    for row in csv_list:
+        this_row = normalize_row(row)
+        
+        # If a row contains 'Cue' and 'Response', it is designated as the column header row.
+        if is_header_row(this_row):
+            indicies['cue'] = get_index_mandatory(this_row, 'cue')
+
+            indicies['response'] = get_index_mandatory(this_row, 'response')
+            indicies['response'].append(get_index(this_row, 'response2'))
+            indicies['response'].append(get_index(this_row, 'response3'))
+
+            indicies['synonym'] = get_index_mandatory(this_row, 'synonym')
+            indicies['synonym'].append(get_index(this_row, 'synonym2'))
+            indicies['synonym'].append(get_index(this_row, 'synonym3'))
+
+            indicies['hint'] = get_indicies(this_row, 'hint')
+            indicies['hint'].append(get_index(this_row, 'hint2'))
+            indicies['hint'].append(get_index(this_row, 'hint3'))
+
+            indicies['tag'] = get_indicies(this_row, 'tag')
+            indicies['tag'].append(get_index(this_row, 'tag2'))
+            indicies['tag'].append(get_index(this_row, 'tag3'))
+
+            indicies['mtag'] = get_indicies(this_row, 'mtag')
+            indicies['mtag'].append(get_index(this_row, 'mtag2'))
+            indicies['mtag'].append(get_index(this_row, 'mtag3'))
+
+            # We're done after the header row.
+            break
+
+def get_csv_column_header_row_number(csv_list):
+    '''Get the CSV column header row number'''
+    for row_number, row in enumerate(csv_list):
+        this_row = normalize_row(row)
+        if is_header_row(this_row):
+            return row_number
+
+    # It's an error if there is no header row.
+    raise CSVError('No header row')
+
+def train(args):
+    '''Begin training'''
+    # Initialize settings and database
+    csv_list = load(args.csvfile)
+    settings = MtSettings()
+
+    # Initialize SQLite
+    conn = sqlite3.connect(':memory:')
+
+    # Initialize indicies dictionary
+    indicies = dict()
+    indicies['cue'] = []
+    indicies['response'] = []
+    indicies['synonym'] = []
+    indicies['tag'] = []
+    indicies['mtag'] = []
+
+    set_csv_settings(settings, csv_list)
+    get_csv_column_indices(indicies, csv_list)
+    csv_column_header_row_number = get_csv_column_header_row_number(csv_list)
+    data_list = csv_list[csv_column_header_row_number+1:]
+
+    # Create tables ###########################################################
+    conn.execute('''CREATE TABLE cues
+                 (cue_id INTEGER PRIMARY KEY,
+                 cue TEXT)''')
+
+    conn.execute('''CREATE TABLE responses
+                 (response_id INTEGER PRIMARY KEY,
+                 cue_id INTEGER,
+                 response TEXT)''')
+
+    conn.execute('''CREATE TABLE synonyms
+                 (synonym_id INTEGER PRIMARY KEY,
+                 response_id INTEGER,
+                 synonym TEXT)''')
+
+    conn.execute('''CREATE TABLE tags
+                 (tag_id INTEGER PRIMARY KEY,
+                 response_id INTEGER,
+                 tag TEXT)''')
+
+    conn.execute('''CREATE TABLE mtags
+                 (mtag_id INTEGER,
+                 mtag TEXT,
+                 response_id INTEGER)''')
+
+    # Save changes
+    conn.commit()
+
+    # Populate the database with data #########################################
+
+    # Cues
+    for data_row in data_list:
+        conn.execute('''INSERT INTO cues(cue)
+                     VALUES (?)''', (data_row[indicies['cue'][0]], ))
+
+    # Response
+    for number, row in enumerate(data_list):
+        for index in indicies['response']:
+            conn.execute('''INSERT INTO responses(cue_id, response)
+                         VALUES (?,?)''', (number, data_row[index]))
+
+
+    # Save changes
+    conn.commit()
+
+    # Debug
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM cues LIMIT 5")
+
+    rows = cur.fetchall()
+
+    for row in rows:
+        print(row)
 
     # Now, parse command line settings. #######################################
 
@@ -336,7 +462,7 @@ def train(args):
         print_header()
 
         # Print first two rows and the cue.
-        print(settings.settings['title'].ljust(69) + iam + ('Cue ' + str(question_number) + '/' + str(total)).rjust(10))
+        print(settings.settings['title'].ljust(69) + iam + ('Response ' + str(question_number) + '/' + str(total)).rjust(10))
         if question_number is not 1:
             print('Correct so far'.ljust(59) + iam + (str(correct) + '/' + str(question_number-1) + ' (' + str(round(percentage, 1)) + '%)').rjust(20))
         print()
