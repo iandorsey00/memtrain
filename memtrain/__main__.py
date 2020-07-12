@@ -127,13 +127,13 @@ def load(csvfile):
 
     return out
 
-def get_indicies(row, target_str):
+def get_indices(row, target_str):
     '''Get all indices for target_str in a row'''
     return [index for index, element in enumerate(row) if element == target_str]
 
 def get_index(row, target_str):
     '''Get the first index for target_str in a row.'''
-    index = get_indicies(row, target_str)[:1]
+    index = get_indices(row, target_str)[:1]
     return index
 
 def get_index_mandatory(row, target_str):
@@ -172,34 +172,34 @@ def set_csv_settings(settings, csv_list):
         elif len([item for item in row if len(item) > 0]) > 1:
             break
 
-def get_csv_column_indices(indicies, csv_list):
-    '''Get column indicies for database processing'''
+def get_csv_column_indices(indices, csv_list):
+    '''Get column indices for database processing'''
     for row in csv_list:
         this_row = normalize_row(row)
         
         # If a row contains 'Cue' and 'Response', it is designated as the column header row.
         if is_header_row(this_row):
-            indicies['cue'] = get_index_mandatory(this_row, 'cue')
+            indices['cue'] = get_index_mandatory(this_row, 'cue')
 
-            indicies['response'] = get_index_mandatory(this_row, 'response')
-            indicies['response'].append(get_index(this_row, 'response2'))
-            indicies['response'].append(get_index(this_row, 'response3'))
+            indices['response'] = get_index_mandatory(this_row, 'response')
+            indices['response'] += get_index(this_row, 'response2')
+            indices['response'] += get_index(this_row, 'response3')
 
-            indicies['synonym'] = get_index_mandatory(this_row, 'synonym')
-            indicies['synonym'].append(get_index(this_row, 'synonym2'))
-            indicies['synonym'].append(get_index(this_row, 'synonym3'))
+            indices['synonym'] = get_index_mandatory(this_row, 'synonym')
+            indices['synonym'] += get_index(this_row, 'synonym2')
+            indices['synonym'] += get_index(this_row, 'synonym3')
 
-            indicies['hint'] = get_indicies(this_row, 'hint')
-            indicies['hint'].append(get_index(this_row, 'hint2'))
-            indicies['hint'].append(get_index(this_row, 'hint3'))
+            indices['hint'] = get_indices(this_row, 'hint')
+            indices['hint'] += get_index(this_row, 'hint2')
+            indices['hint'] += get_index(this_row, 'hint3')
 
-            indicies['tag'] = get_indicies(this_row, 'tag')
-            indicies['tag'].append(get_index(this_row, 'tag2'))
-            indicies['tag'].append(get_index(this_row, 'tag3'))
+            indices['tag'] = get_indices(this_row, 'tag')
+            indices['tag'] += get_index(this_row, 'tag2')
+            indices['tag'] += get_index(this_row, 'tag3')
 
-            indicies['mtag'] = get_indicies(this_row, 'mtag')
-            indicies['mtag'].append(get_index(this_row, 'mtag2'))
-            indicies['mtag'].append(get_index(this_row, 'mtag3'))
+            indices['mtag'] = get_indices(this_row, 'mtag')
+            indices['mtag'] += get_index(this_row, 'mtag2')
+            indices['mtag'] += get_index(this_row, 'mtag3')
 
             # We're done after the header row.
             break
@@ -223,16 +223,16 @@ def train(args):
     # Initialize SQLite
     conn = sqlite3.connect(':memory:')
 
-    # Initialize indicies dictionary
-    indicies = dict()
-    indicies['cue'] = []
-    indicies['response'] = []
-    indicies['synonym'] = []
-    indicies['tag'] = []
-    indicies['mtag'] = []
+    # Initialize indices dictionary
+    indices = dict()
+    indices['cue'] = []
+    indices['response'] = []
+    indices['synonym'] = []
+    indices['tag'] = []
+    indices['mtag'] = []
 
     set_csv_settings(settings, csv_list)
-    get_csv_column_indices(indicies, csv_list)
+    get_csv_column_indices(indices, csv_list)
     csv_column_header_row_number = get_csv_column_header_row_number(csv_list)
     data_list = csv_list[csv_column_header_row_number+1:]
 
@@ -243,47 +243,199 @@ def train(args):
 
     conn.execute('''CREATE TABLE responses
                  (response_id INTEGER PRIMARY KEY,
-                 cue_id INTEGER,
+                 placement INTEGER,
                  response TEXT)''')
+
+    conn.execute('''CREATE TABLE cues_to_responses
+                 (cue_id INTEGER,
+                 response_id INTEGER,
+                 PRIMARY KEY (cue_id, response_id))''')
 
     conn.execute('''CREATE TABLE synonyms
                  (synonym_id INTEGER PRIMARY KEY,
-                 response_id INTEGER,
                  synonym TEXT)''')
+
+    conn.execute('''CREATE TABLE responses_to_synonyms
+                 (response_id INTEGER,
+                 synonym_id INTEGER,
+                 PRIMARY KEY (response_id, synonym_id))''')
 
     conn.execute('''CREATE TABLE tags
                  (tag_id INTEGER PRIMARY KEY,
-                 response_id INTEGER,
                  tag TEXT)''')
 
+    conn.execute('''CREATE TABLE responses_to_tags
+                 (response_id INTEGER,
+                 tag_id INTEGER,
+                 PRIMARY KEY (response_id, tag_id))''')
+
     conn.execute('''CREATE TABLE mtags
-                 (mtag_id INTEGER,
-                 mtag TEXT,
-                 response_id INTEGER)''')
+                 (mtag_id INTEGER PRIMARY KEY,
+                 mtag TEXT)''')
+
+    conn.execute('''CREATE TABLE responses_to_mtags
+                 (response_id INTEGER,
+                 mtag_id INTEGER,
+                 PRIMARY KEY (response_id, mtag_id))''')
 
     # Save changes
     conn.commit()
 
     # Populate the database with data #########################################
 
-    # Cues
+    # cues table
+    cue_list = []
+
     for data_row in data_list:
-        conn.execute('''INSERT INTO cues(cue)
-                     VALUES (?)''', (data_row[indicies['cue'][0]], ))
+        cue = data_row[indices['cue'][0]]
+        if cue not in cue_list:
+            conn.execute('''INSERT INTO cues(cue)
+                         VALUES (?)''', (cue, ))
+            cue_list.append(cue)
 
-    # Response
-    for number, row in enumerate(data_list):
-        for index in indicies['response']:
-            conn.execute('''INSERT INTO responses(cue_id, response)
-                         VALUES (?,?)''', (number, data_row[index]))
+    # responses table
+    response_list = []
 
+    for data_row in data_list:
+        for placement, index in enumerate(indices['response']):
+            response = data_row[index]
+            # Add response only if it's not empty and hasn't been added before.
+            if response and response not in response_list:
+                conn.execute('''INSERT INTO responses(placement, response)
+                            VALUES (?,?)''', (placement+1, response))
+                response_list.append(response)
+
+    # cues_to_response table
+    for data_row in data_list:
+        # Get the cue_id
+        cue = data_row[indices['cue'][0]]
+        cue_id = cue_list.index(cue) + 1
+        
+        # Get the response_id
+        for placement, index in enumerate(indices['response']):
+            response = data_row[index]
+
+            if response:
+                response_id = response_list.index(response) + 1
+
+                conn.execute('''INSERT INTO cues_to_responses(cue_id, response_id)
+                            VALUES (?,?)''', (cue_id, response_id))
+
+    # synonyms table
+    synonym_list = []
+
+    for number, data_row in enumerate(data_list):
+        for index in indices['synonym']:
+            synonym = data_row[index]
+            # Add row only if it's not empty
+            if synonym and synonym not in synonym_list:
+                conn.execute('''INSERT INTO synonyms(synonym)
+                             VALUES (?)''', (synonym, ))
+                synonym_list.append(synonym)
+
+    # responses_to_synonyms table
+    responses_to_synonyms_list = []
+
+    for data_row in data_list:
+        # Get the response_id
+        for placement, index in enumerate(indices['response']):
+            response = data_row[index]
+
+            if response:
+                response_id = response_list.index(response) + 1
+
+                # Get the synonym_id
+                synonym = data_row[indices['synonym'][placement]]
+
+                if synonym:
+                    synonym_id = synonym_list.index(synonym) + 1
+                    pair = (response_id, synonym_id)
+
+                    if pair not in responses_to_synonyms_list:
+                        conn.execute('''INSERT INTO responses_to_synonyms(response_id, synonym_id)
+                                    VALUES (?,?)''', pair)
+                        responses_to_synonyms_list.append(pair)
+
+    # tags table
+    tag_list = []
+
+    for number, data_row in enumerate(data_list):
+        for index in indices['tag']:
+            tag = data_row[index]
+            # Add row only if it's not empty
+            if tag and tag not in tag_list:
+                conn.execute('''INSERT INTO tags(tag)
+                             VALUES (?)''', (tag, ))
+                tag_list.append(tag)
+
+    # responses_to_tags table
+    responses_to_tag_list = []
+
+    for data_row in data_list:
+        # Get the response_id
+        for placement, index in enumerate(indices['response']):
+            response = data_row[index]
+
+            if response:
+                response_id = response_list.index(response) + 1
+
+                # Get the tag_id
+                # Only one tag placement per cue
+                for tag_index in indices['tag']:
+                    tag = data_row[tag_index]
+
+                    if tag:
+                        tag_id = tag_list.index(tag) + 1
+                        pair = (response_id, tag_id)
+
+                        if pair not in responses_to_tag_list:
+                            conn.execute('''INSERT INTO responses_to_tags(response_id, tag_id)
+                                        VALUES (?,?)''', pair)
+                            responses_to_tag_list.append(pair)
+
+    # mtags table
+    mtag_list = []
+
+    for number, data_row in enumerate(data_list):
+        for index in indices['mtag']:
+            mtag = data_row[index]
+            # Add row only if it's not empty
+            if mtag and mtag not in mtag_list:
+                conn.execute('''INSERT INTO mtags(mtag)
+                             VALUES (?)''', (mtag, ))
+                mtag_list.append(mtag)
+
+    # responses_to_mtags table
+    responses_to_mtag_list = []
+
+    for data_row in data_list:
+        # Get the response_id
+        for placement, index in enumerate(indices['response']):
+            response = data_row[index]
+
+            if response:
+                response_id = response_list.index(response) + 1
+
+                # Get the mtag_id
+                # Only one mtag placement per cue
+                for mtag_index in indices['mtag']:
+                    mtag = data_row[mtag_index]
+
+                    if mtag:
+                        mtag_id = mtag_list.index(mtag) + 1
+                        pair = (response_id, mtag_id)
+
+                        if pair not in responses_to_mtag_list:
+                            conn.execute('''INSERT INTO responses_to_mtags(response_id, mtag_id)
+                                        VALUES (?,?)''', pair)
+                            responses_to_mtag_list.append(pair)
 
     # Save changes
     conn.commit()
 
     # Debug
     cur = conn.cursor()
-    cur.execute("SELECT * FROM cues LIMIT 5")
+    cur.execute("SELECT * FROM responses_to_mtags")
 
     rows = cur.fetchall()
 
@@ -327,16 +479,16 @@ def train(args):
 
     # Read cue/response pairs, hints, tags, and mtags
     for row_number, row in enumerate(database[header_row + 1:]):
-        cue = row[indicies['cue']]
-        response = row[indicies['response']]
+        cue = row[indices['cue']]
+        response = row[indices['response']]
         hints = []
         tags = []
         mtags = []
-        for index in indicies['hint']:
+        for index in indices['hint']:
             hints.append(row[index])
-        for index in indicies['tag']:
+        for index in indices['tag']:
             tags.append(row[index])
-        for index in indicies['mtag']:
+        for index in indices['mtag']:
             mtags.append(row[index])
         cr_database.append({'cue': cue, 'response': response, 'hints': hints,
         'tags': tags, 'mtags': mtags})
