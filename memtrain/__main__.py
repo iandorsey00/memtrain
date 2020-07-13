@@ -149,7 +149,7 @@ def get_index_mandatory(row, target_str):
     return index
 
 def is_header_row(row):
-    '''Determine whether the current row is the header row'''
+    '''Determine whether the curent row is the header row'''
     return 'cue' in row and 'response' in row
 
 def set_csv_settings(settings, csv_list):
@@ -238,12 +238,12 @@ def train(args):
 
     conn.execute('''CREATE TABLE responses
                  (response_id INTEGER PRIMARY KEY,
-                 placement INTEGER,
                  response TEXT)''')
 
     conn.execute('''CREATE TABLE cues_to_responses
                  (cue_id INTEGER,
                  response_id INTEGER,
+                 placement INTEGER,
                  PRIMARY KEY (cue_id, response_id))''')
 
     conn.execute('''CREATE TABLE synonyms
@@ -292,15 +292,17 @@ def train(args):
     response_list = []
 
     for data_row in data_list:
-        for placement, index in enumerate(indices['response']):
+        for index in indices['response']:
             response = data_row[index]
             # Add response only if it's not empty and hasn't been added before.
             if response and response not in response_list:
-                conn.execute('''INSERT INTO responses(placement, response)
-                            VALUES (?,?)''', (placement+1, response))
+                conn.execute('''INSERT INTO responses(response)
+                             VALUES (?)''', (response, ))
                 response_list.append(response)
 
     # cues_to_response table
+    all_cues = []
+
     for data_row in data_list:
         # Get the cue_id
         cue = data_row[indices['cue'][0]]
@@ -313,8 +315,12 @@ def train(args):
             if response:
                 response_id = response_list.index(response) + 1
 
-                conn.execute('''INSERT INTO cues_to_responses(cue_id, response_id)
-                            VALUES (?,?)''', (cue_id, response_id))
+                # To determine placement, see if this cue has come up before.
+                all_cues.append(cue_id)
+                placement = len([i for i in all_cues if i == cue_id])
+
+                conn.execute('''INSERT INTO cues_to_responses(cue_id, response_id, placement)
+                            VALUES (?,?,?)''', (cue_id, response_id, placement))
 
     # synonyms table
     synonym_list = []
@@ -430,9 +436,9 @@ def train(args):
 
     # Helper methods ##########################################################
     def memtrain_query(columns, tables):
-        curr = conn.cursor()
-        curr.execute('''SELECT {} FROM {}'''.format(columns, tables))
-        rows = curr.fetchall()
+        cur = conn.cursor()
+        cur.execute('''SELECT {} FROM {}'''.format(columns, tables))
+        rows = cur.fetchall()
         columns = len(columns.split(','))
         if columns == 1:
             rows = list(map(lambda x: x[0], rows))
@@ -444,6 +450,19 @@ def train(args):
 
     def get_all_response_ids():
         return memtrain_query('response_id', 'responses')
+
+    def get_all_response_ids_by_tag(tag):
+        cur = conn.cursor()
+        cur.execute('''SELECT tag_id FROM tags
+                     WHERE tag = (?)''', (str(tag), ))
+        rows = cur.fetchall()
+        tag_id = rows[0][0]
+        cur.execute('''SELECT response_id FROM responses_to_tags
+                     WHERE tag_id = (?)''', (str(tag_id), ))
+        rows = cur.fetchall()
+        rows = list(map(lambda x: x[0], rows))
+
+        return rows
 
     def get_all_cue_response_id_pairs():
         return memtrain_query('cue_id, response_id', 'cues_to_responses')
@@ -483,11 +502,6 @@ def train(args):
         else:
             settings.settings['nquestions'] = args.nquestions
 
-    # Filter out other tags if they were specified on the command line.
-    if args.tags:
-        args_tags = args.tags.split(',')
-        cr_database = [row for row in cr_database if not set(args_tags).isdisjoint(row['tags'])]
-
     # Get responses and aliases
     responses = get_all_responses()
     aliases = dict()
@@ -512,6 +526,15 @@ def train(args):
 
     # Main training program ###################################################
     cr_id_pairs = get_all_cue_response_id_pairs()
+
+    # Filter out other tags if tags were specified on the command line.
+    if args.tags:
+        these_response_ids = []
+        args_tags = args.tags.split(',')
+        for tag in args_tags:
+            these_response_ids += get_all_response_ids_by_tag(tag)
+        these_response_ids = list(set(these_response_ids))
+        cr_id_pairs = [i for i in cr_id_pairs if i[1] in these_response_ids]
 
     # List of times
     times = []
@@ -558,14 +581,14 @@ def train(args):
 
     # Raise NoResponsesError if there are no responses available.
     if total == 0:
-        raise NoResponsesError('There are no cues available that match the criteria.')
+        raise NoResponsesError('There are no responses available that match the criteria.')
 
     # Prompt helper methods ###################################################
-    curr = conn.cursor()
+    cur = conn.cursor()
 
     def memtrain_get_value(value, value_id):
-        curr.execute('''SELECT {} FROM {} WHERE {} = (?)'''.format(value, value + 's', value + '_id'), (str(value_id), ))
-        rows = curr.fetchall()
+        cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''.format(value, value + 's', value + '_id'), (str(value_id), ))
+        rows = cur.fetchall()
         return rows[0][0]
 
     def get_cue(cue_id):
@@ -575,8 +598,8 @@ def train(args):
         return memtrain_get_value('response', response_id)
 
     def get_mtags(response_id):
-        curr.execute('''SELECT mtag_id FROM responses_to_mtags WHERE response_id = (?)''', (str(response_id), ))
-        rows = curr.fetchall()
+        cur.execute('''SELECT mtag_id FROM responses_to_mtags WHERE response_id = (?)''', (str(response_id), ))
+        rows = cur.fetchall()
         rows = list(map(lambda x: x[0], rows))
 
         out = []
@@ -586,17 +609,62 @@ def train(args):
 
         return out
 
+    def get_placement(cue_id, response_id):
+        cur.execute('''SELECT placement FROM cues_to_responses WHERE cue_id = (?) AND response_id = (?)''', (str(cue_id), str(response_id)))
+        rows = cur.fetchall()
+        return rows[0][0]
+
+    def get_responses_by_mtag(mtag):
+        cur.execute('''SELECT mtag_id FROM mtags WHERE mtag = (?)''', (mtag, ))
+        rows = cur.fetchall()
+        rows = list(map(lambda x: x[0], rows))
+
+        response_ids = []
+
+        for mtag_id in rows:
+            cur.execute('''SELECT response_id FROM responses_to_mtags WHERE mtag_id = (?)''', (mtag_id, ))
+            rows = cur.fetchall()
+            response_ids.append(rows[0][0])
+
+        out = []
+
+        for response_id in response_ids:
+            out.append(memtrain_get_value('response', response_id))
+
+        return out
+
+    def is_plural(string):
+        return string[-1] == 's'
+
+    plural_responses = [i for i in responses if is_plural(i)]
+    nonplural_responses = [i for i in responses if not is_plural(i)]
+
     # Prompts #################################################################
     for cue_id, response_id in cr_id_pairs:
         cue = get_cue(cue_id)
         response = get_response(response_id)
+        placement = get_placement(cue_id, response_id)
         # hints = response_id_to_hints(response_id)
         mtags = get_mtags(response_id)
         # Get number of mtags
         n_mtags = len(mtags)
 
         # Format the cue
-        f_cue = cue.replace('{{}}', '_________')
+        f_cue = cue.replace('{{}}', '_' * 9)
+
+        if placement == 1:
+            f_cue = f_cue.replace('{{1}}', '___(1)___')
+        else:
+            f_cue = f_cue.replace('{{1}}', '_' * 9)
+        if placement == 2:
+            f_cue = f_cue.replace('{{2}}', '___(2)___')
+        else:
+            f_cue = f_cue.replace('{{2}}', '_' * 9)
+        if placement == 3:
+            f_cue = f_cue.replace('{{3}}', '___(3)___')
+        else:
+            f_cue = f_cue.replace('{{3}}', '_' * 9)
+
         f_cue = textwrap.fill(f_cue, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
 
         # Print how questions were answered correctly so far if we are not on
@@ -620,7 +688,7 @@ def train(args):
         print_header()
 
         # Print first two rows and the cue.
-        print(settings.settings['title'].ljust(69) + iam + ('Response ' + str(response_number) + '/' + str(total)).rjust(10))
+        print(settings.settings['title'].ljust(59) + iam + ('Response ' + str(response_number) + '/' + str(total)).rjust(20))
         if response_number is not 1:
             print('Correct so far'.ljust(59) + iam + (str(correct) + '/' + str(response_number-1) + ' (' + str(round(percentage, 1)) + '%)').rjust(20))
         print()
@@ -629,23 +697,44 @@ def train(args):
 
         # If on level one, generate the multiple choice questions.
         if settings.settings['level1']:
-            # Get responses for all mtags
-            response_pool = []
+            # Get responses for all mtags for this response
+            same_mtag_responses = []
+
             for mtag in mtags:
-                response_pool += mtag_list[mtag]
-            # Shuffle responses
-            random.shuffle(response_pool)
-            # Get all responses, in case we run out
-            all_responses = list(responses)
-            random.shuffle(all_responses)
-            # Make sure the correct answer is removed from both response_pool and all_responses
-            response_pool = [i for i in response_pool if i != response]
-            all_responses = [i for i in all_responses if i != response]
+                same_mtag_responses += get_responses_by_mtag(mtag)
+
+            # Get responses of the same and the other plurality
+            plurality = is_plural(response)
+
+            same_plurality_responses = list(plural_responses) if plurality else list(nonplural_responses)
+            other_plurality_responses = list(nonplural_responses) if plurality else list(plural_responses)
+
+            # We will select first from same_mtag_responses. Then, if
+            # that's empty, we'll select from same_plurality_responses. If
+            # that's also empty, we'll resort to other_plurality_responses.
+
+            # Filter all three of these lists to make sure they don't contain
+            # the correct response
+            same_mtag_responses = [i for i in same_mtag_responses if i != response]
+            same_plurality_responses = [i for i in same_plurality_responses if i != response]
+            # The response won't be located in other_plurality_responses.
+
+            # Filter the pluarlity_responses lists
+            same_plurality_responses = [i for i in same_plurality_responses if i not in same_mtag_responses]
+            other_plurality_responses = [i for i in other_plurality_responses if i not in same_mtag_responses]
+
+            # Shuffle the response lists.
+            random.shuffle(same_mtag_responses)
+            random.shuffle(same_plurality_responses)
+            random.shuffle(other_plurality_responses)
 
             # Get our ascii range for the multiple choice questions
             ascii_range = string.ascii_lowercase[:4]
             # Get the index of the correct answer.
             correct_letter = random.choice(ascii_range)
+
+            response_pool_consumption_index = 0
+            response_pool = same_mtag_responses
 
             # Loop through the ascii range
             for i in ascii_range:
@@ -655,21 +744,22 @@ def train(args):
                 # Otherwise...
                 else:
                     # If the response_pool is empty...
-                    if len(response_pool) == 0:
-                        # Pop a response from all responses
-                        this_response = all_responses.pop()
-                        # Remove that response (in case there's a duplicate)
-                        all_responses = [i for i in all_responses if not i.lower() == this_response.lower()]
-                    # If the response_pool is not empty...
-                    else:
-                        # Pop a response from the response pool
-                        this_response = response_pool.pop()
-                        # Remove that response (in case there's a duplicate)
-                        response_pool = [i for i in response_pool if not i.lower() == this_response.lower()]
+                    while len(response_pool) == 0:
+                        response_pool_consumption_index = response_pool_consumption_index + 1
+
+                        if response_pool_consumption_index == 1:
+                            response_pool = same_plurality_responses
+                        elif response_pool_consumption_index == 2:
+                            response_pool = other_plurality_responses
+                        elif response_pool_consumption_index > 2:
+                            raise NoResponsesError('There are no more responses available.')
+
+                    this_response = response_pool.pop()
                 # Capitalize only the first letter of this_response
                 this_response = this_response[0].upper() + this_response[1:]
                 # Now that we have our response, print it
-                print((i + ')').ljust(5) + iam + this_response)
+                f_response = textwrap.fill(this_response, initial_indent=i + ')' + ' ' * 4, subsequent_indent=' ' * 6, width=80)
+                print(f_response)
 
             print()
         
