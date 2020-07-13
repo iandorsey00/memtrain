@@ -640,7 +640,15 @@ def train(args):
     nonplural_responses = [i for i in responses if not is_plural(i)]
 
     # Prompts #################################################################
-    for cue_id, response_id in cr_id_pairs:
+    user_input = None
+    elasped_time = None
+    incorrect_responses = []
+    valid_response = False
+
+    def render_question(cue_id, response_id):
+        user_input = None
+        elasped_time = None
+
         cue = get_cue(cue_id)
         response = get_response(response_id)
         placement = get_placement(cue_id, response_id)
@@ -774,12 +782,30 @@ def train(args):
 
         # Start time
         start = time.time()
-        # Prompt for a response
-        user_input = input('Enter response: ')
+        # Prompt for a response choice
+        if settings.settings['level1']:
+            user_input = input('Enter response choice: ')
+        else:
+            user_input = input('Enter response: ')
+
+        user_input = user_input.lower()
+
         # End time
         end = time.time()
-        # Get elapsed time and add it to times.
         elasped_time = end - start
+
+        if user_input in [char for char in ascii_range]:
+            valid_response = True
+
+    for cue_id, response_id in cr_id_pairs:
+        while not valid_response:
+            render_question(cue_id, response_id)
+            if not valid_response:
+                os.system('clear')
+                print('Please enter a valid response.')
+                print()
+
+        # Get elapsed time and add it to times.
         times.append(elasped_time)
         print()
         # Clear screen.
@@ -803,6 +829,7 @@ def train(args):
         else:
             print('Incorrect. Answer: ' + response)
             incorrect = incorrect + 1
+            incorrect_responses += response
         print()
         response_number = response_number + 1 
 
@@ -818,6 +845,12 @@ def train(args):
     print('Correct: ' + str(correct) + '/' + str(total) + ' (' + str(round(percentage, 1)) + '%)')
     print('Average response time: ' + str(timedelta(seconds=mean(times))))
     print()
+    if(incorrect > 0):
+        incorrect_responses_str = ', '.join(incorrect_responses)
+        f_incorrect_responses_str = textwrap.fill(incorrect_responses_str, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
+        print('Responses for which answers were incorrect:')
+        print()
+        print(f_incorrect_responses_str)
 
 ###############################################################################
 # Argument parsing with argparse
