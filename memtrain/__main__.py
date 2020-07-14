@@ -502,61 +502,6 @@ def train(args):
     if total == 0:
         raise NoResponsesError('There are no responses available that match the criteria.')
 
-    # Prompt helper methods ###################################################
-    cur = conn.cursor()
-
-    def memtrain_get_value(value, value_id):
-        cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''.format(value, value + 's', value + '_id'), (str(value_id), ))
-        rows = cur.fetchall()
-        return rows[0][0]
-
-    def get_cue(cue_id):
-        return memtrain_get_value('cue', cue_id)
-
-    def get_response(response_id):
-        return memtrain_get_value('response', response_id)
-
-    def get_mtags(response_id):
-        cur.execute('''SELECT mtag_id FROM responses_to_mtags WHERE response_id = (?)''', (str(response_id), ))
-        rows = cur.fetchall()
-        rows = list(map(lambda x: x[0], rows))
-
-        out = []
-
-        for mtag_id in rows:
-            out.append(memtrain_get_value('mtag', mtag_id))
-
-        return out
-
-    def get_placement(cue_id, response_id):
-        cur.execute('''SELECT placement FROM cues_to_responses WHERE cue_id = (?) AND response_id = (?)''', (str(cue_id), str(response_id)))
-        rows = cur.fetchall()
-        return rows[0][0]
-
-    def get_responses_by_mtag(mtag):
-        cur.execute('''SELECT mtag_id FROM mtags WHERE mtag = (?)''', (mtag, ))
-        rows = cur.fetchall()
-        rows = list(map(lambda x: x[0], rows))
-
-        response_ids = []
-
-        for mtag_id in rows:
-            cur.execute('''SELECT response_id FROM responses_to_mtags WHERE mtag_id = (?)''', (mtag_id, ))
-            rows = cur.fetchall()
-            response_ids.append(rows[0][0])
-
-        out = []
-
-        for response_id in response_ids:
-            out.append(memtrain_get_value('response', response_id))
-
-        return out
-
-    def is_plural(string):
-        return string[-1] == 's'
-
-    plural_responses = [i for i in responses if is_plural(i)]
-    nonplural_responses = [i for i in responses if not is_plural(i)]
 
     # Prompts #################################################################
     user_input = None
