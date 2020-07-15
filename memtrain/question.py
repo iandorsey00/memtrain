@@ -23,12 +23,14 @@ class Question:
         self.mchoices = []
 
         self.mtstatistics = None
+        self.aliases = []
 
         self.iam = ' '
         self.ascii_range = ['a', 'b', 'c', 'd']
 
         self.response = ''
         self.user_input = ''
+        self.synonyms = []
 
         self.plural_responses = [i for i in self.responses if self.is_plural(i)]
         self.nonplural_responses = [i for i in self.responses if not self.is_plural(i)]
@@ -45,6 +47,36 @@ class Question:
 
     def get_response(self, response_id):
         return self.get_value('response', response_id)
+
+    def get_hints(self):
+        # Translate response_id into hint_id
+        self.cur.execute('''SELECT hint_id FROM responses_to_hints
+                         WHERE response_id = (?)''', (str(self.response_id), ))
+        rows = self.cur.fetchall()
+        rows = list(map(lambda x: x[0], rows))
+
+        out = []
+
+        # Translate hint_id to hint
+        for hint_id in rows:
+            out.append(self.get_value('hint', hint_id))
+
+        return out
+
+    def get_synonyms(self):
+        # Translate response_id into synonym_id
+        self.cur.execute('''SELECT synonym_id FROM responses_to_synonyms
+                         WHERE response_id = (?)''', (str(self.response_id), ))
+        rows = self.cur.fetchall()
+        rows = list(map(lambda x: x[0], rows))
+
+        out = []
+
+        # Translate synonym_id to synonym
+        for synonym_id in rows:
+            out.append(self.get_value('synonym', synonym_id))
+
+        return out
 
     def get_mtags(self):
         # Translate response_id into mtag_id
@@ -214,6 +246,13 @@ class Question:
 
         return out
 
+    def print_hints(self):
+        for hint in self.hints:
+            if hint:
+                # Format hint to match cue.
+                f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
+                print(f_hint)
+
     def print_mchoices(self):
         '''Print the multiple choices for Level 1'''
         for letter, choice in self.mchoices.items():
@@ -232,10 +271,58 @@ class Question:
         self.user_input = self.user_input.lower()
 
     def validate_input(self):
-        if self.user_input in self.ascii_range:
-            self.mtstatistics.is_input_valid = True
+        self.mtstatistics.is_input_valid = False
+
+        if self.settings.settings['level1']:
+            if self.user_input in self.ascii_range:
+                self.mtstatistics.is_input_valid = True
         else:
-            self.mtstatistics.is_input_valid = False
+            if self.user_input:
+                self.mtstatistics.is_input_valid = True
+
+    def standardize_string(self, string):
+        '''Standardize strings so they can be compared for correctness'''
+        # The idea here is that a question shouldn't be marked wrong just
+        # because the user forgot to enter a hyphen or a space or used the
+        # wrong case.
+        #
+        # Standarization involves the removal of all case, whitespace, and
+        # hyphens. This means the grading of questions is not case, whitespace,
+        # or hyphen sensitive.
+        
+        # Remove case (transform to lowercase)
+        out = string.lower()
+        # Remove whitespace
+        out = ''.join(out.split())
+        # Remove hyphens
+        out = out.replace('-', '')
+        out = out.replace('–', '')
+        out = out.replace('—', '')
+
+    def determine_equivalence(self):
+        '''See if input matches an alias, synonym, or standarized string'''
+        self.mtstatistics.is_input_correct = False
+
+        # Is there an alias?
+        if self.user_input in self.aliases.keys():
+            if self.aliases[user_input] == self.user_input:
+                self.mtstatistics.is_input_correct = True
+        
+        # If not, does the input match the response?
+        std_input = self.standardize_string(self.user_input)
+        std_response = self.standardize_string(self.response)
+
+        if std_input == std_response:
+            self.mtstatistics.used_response = self.response
+            self.mtstatistics.is_input_correct = True
+
+        if not self.mtstatistics.is_input_correct:
+            # If not, does the input match a synonym?
+            for synonym in self.synonyms:
+                std_synonym = self.standardize_string(synonym)
+                if std_input == std_synonym:
+                    self.mtstatistics.used_synonym = synonym
+                    self.mtstatistics.is_input_correct = True
 
     def grade_input(self):
         '''Determine whether input is correct.'''
@@ -246,28 +333,57 @@ class Question:
             self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower()
         elif self.settings.settings['level2'] or self.settings.settings['level3']:
             # For levels 2 or 3, make sure the right alias was entered.
-            if self.user_input in aliases.keys():
-                self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower() or self.response == self.aliases[user_input.lower()]
-            else:
-                self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower()
+            self.determine_equivalence()
     
     def finalize(self):
         '''Notify the user of correctness, update statistics, and print'''
         if self.mtstatistics.is_input_correct:
-            print('Correct.')
             self.mtstatistics.number_correct += 1
+            if self.mtstatistics.has_synonym_been_used():
+                remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
+                default_answer_str = 'Correct. Default answer: ' + self.response
+                other_correct_responses_str = 'Other correct responses: ' + ', '.join(remaining_synonyms)
+                f_default_answer_str = textwrap.fill(default_answer_str, width=80)
+                f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+
+                print(f_default_answer_str)
+
+                if remaining_synonyms:
+                    print(f_other_correct_responses_str)
+                else:
+                    print()
+            else:
+                print('Correct.')
+                other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+                f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+
+                if self.synonyms:
+                    print(f_other_correct_responses_str)
+                else:
+                    print()
+
         else:
-            print('Incorrect. Answer: ' + self.response)
             self.mtstatistics.number_incorrect += 1
             self.mtstatistics.incorrect_responses.append(self.response)
+            print('Incorrect. Answer: ' + self.response)
+
+            other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+            f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+            
+            if self.synonyms:
+                print(f_other_correct_responses_str)
+            else:
+                print()
 
         print()
 
         self.mtstatistics.response_number += 1
+        self.mtstatistics.used_synonym = ''
 
-    def render_question(self, cue_id, response_id, mtstatistics):
+    def render_question(self, cue_id, response_id, mtstatistics, aliases):
         '''Render the question'''
         self.mtstatistics = mtstatistics
+        self.aliases = aliases
 
         is_last_question = self.cue_id == cue_id and self.response_id == response_id
 
@@ -278,22 +394,14 @@ class Question:
             self.cue = self.get_cue(self.cue_id)
             self.response = self.get_response(self.response_id)
             self.placement = self.get_placement(self.cue_id, self.response_id)
-            # hints = response_id_to_hints(response_id)
+            self.synonyms = self.get_synonyms()
+            self.hints = self.get_hints()
             self.mtags = self.get_mtags()
-            mtstatistics.update_percentage()
+            self.mtstatistics.update_percentage()
 
-            # If on level one, generate the multiple choice questions.
+            # If on Level 1, generate the multiple choice questions.
             if self.settings.settings['level1']:
                 self.mchoices = self.generate_mchoices()
-           
-            # elif settings.settings['level2']:
-            #     for hint in hints:
-            #         # Print hint only if it is not empty.
-            #         if len(hint) != 0:
-            #             # Format hint to match cue.
-            #             f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
-            #             print(f_hint)
-            #             print()
 
         self.print_header()
 
@@ -304,6 +412,9 @@ class Question:
 
         if self.settings.settings['level1']:
             self.print_mchoices()
+            print()
+        elif self.settings.settings['level2']:
+            self.print_hints()
             print()
 
         # Start time

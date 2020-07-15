@@ -32,6 +32,15 @@ class Database:
                           synonym_id INTEGER,
                           PRIMARY KEY (response_id, synonym_id))''')
 
+        self.conn.execute('''CREATE TABLE hints
+                          (hint_id INTEGER PRIMARY KEY,
+                          hint TEXT)''')
+
+        self.conn.execute('''CREATE TABLE responses_to_hints
+                          (response_id INTEGER,
+                          hint_id INTEGER,
+                          PRIMARY KEY (response_id, hint_id))''')
+
         self.conn.execute('''CREATE TABLE tags
                           (tag_id INTEGER PRIMARY KEY,
                           tag TEXT)''')
@@ -134,6 +143,41 @@ class Database:
                             self.conn.execute('''INSERT INTO responses_to_synonyms(response_id, synonym_id)
                                         VALUES (?,?)''', pair)
                             responses_to_synonyms_list.append(pair)
+
+        # hints table
+        hint_list = []
+
+        for number, data_row in enumerate(data_list):
+            for index in indices['hint']:
+                hint = data_row[index]
+                # Add row only if it's not empty
+                if hint and hint not in hint_list:
+                    self.conn.execute('''INSERT INTO hints(hint)
+                                VALUES (?)''', (hint, ))
+                    hint_list.append(hint)
+
+        # responses_to_hints table
+        responses_to_hints_list = []
+
+        for data_row in data_list:
+            # Get the response_id
+            for placement, index in enumerate(indices['response']):
+                response = data_row[index]
+
+                if response:
+                    response_id = response_list.index(response) + 1
+
+                    # Get the hint_id
+                    hint = data_row[indices['hint'][placement]]
+
+                    if hint:
+                        hint_id = hint_list.index(hint) + 1
+                        pair = (response_id, hint_id)
+
+                        if pair not in responses_to_hints_list:
+                            self.conn.execute('''INSERT INTO responses_to_hints(response_id, hint_id)
+                                        VALUES (?,?)''', pair)
+                            responses_to_hints_list.append(pair)
 
         # tags table
         tag_list = []
@@ -243,4 +287,3 @@ class Database:
 
     def get_all_cue_response_id_pairs(self):
         return self.query('cue_id, response_id', 'cues_to_responses')
-

@@ -141,6 +141,7 @@ def train(args):
     indices['cue'] = []
     indices['response'] = []
     indices['synonym'] = []
+    indices['hint'] = []
     indices['tag'] = []
     indices['mtag'] = []
 
@@ -264,7 +265,7 @@ def train(args):
         # Don't continue with the loop until a valid response has been
         # entered.
         while not mtstatistics.is_input_valid:
-            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
+            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics, aliases)
 
     question.print_header(True)
     print()

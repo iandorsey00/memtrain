@@ -14,6 +14,7 @@ class MtStatistics:
         self.is_input_correct = False
 
         self.times = []
+        self.used_synonym = ''
 
         self.incorrect_responses = []
 
@@ -24,6 +25,9 @@ class MtStatistics:
                               / Decimal(self.response_number-1) * Decimal(100)
         else:
             self.percentage = 0.0
+
+    def has_synonym_been_used(self):
+        return bool(self.used_synonym)
 
     def formatted_incorrect_responses(self):
         incorrect_responses_str = ', '.join(self.incorrect_responses)
