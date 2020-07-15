@@ -105,13 +105,13 @@ def get_csv_column_indices(indices, csv_list):
             indices['response'] += get_index(this_row, 'response2')
             indices['response'] += get_index(this_row, 'response3')
 
-            indices['synonym'] = get_index_mandatory(this_row, 'synonym')
-            indices['synonym'] += get_index(this_row, 'synonym2')
-            indices['synonym'] += get_index(this_row, 'synonym3')
+            indices['synonym'] = [get_indices(this_row, 'synonym')]
+            indices['synonym'].append(get_indices(this_row, 'synonym2'))
+            indices['synonym'].append(get_indices(this_row, 'synonym3'))
 
-            indices['hint'] = get_indices(this_row, 'hint')
-            indices['hint'] += get_index(this_row, 'hint2')
-            indices['hint'] += get_index(this_row, 'hint3')
+            indices['hint'] = [get_indices(this_row, 'hint')]
+            indices['hint'].append(get_indices(this_row, 'hint2'))
+            indices['hint'].append(get_indices(this_row, 'hint3'))
 
             indices['tag'] = get_indices(this_row, 'tag')
             indices['mtag'] = get_indices(this_row, 'mtag')

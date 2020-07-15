@@ -79,7 +79,7 @@ class Database:
         response_list = []
 
         for data_row in data_list:
-            for index in indices['response']:
+            for placement, index in enumerate(indices['response']):
                 response = data_row[index]
                 # Add response only if it's not empty and hasn't been added before.
                 if response and response not in response_list:
@@ -111,15 +111,17 @@ class Database:
 
         # synonyms table
         synonym_list = []
+        print(indices['synonym'])
 
         for number, data_row in enumerate(data_list):
-            for index in indices['synonym']:
-                synonym = data_row[index]
-                # Add row only if it's not empty
-                if synonym and synonym not in synonym_list:
-                    self.conn.execute('''INSERT INTO synonyms(synonym)
-                                VALUES (?)''', (synonym, ))
-                    synonym_list.append(synonym)
+            for placement, indices_for_placement in enumerate(indices['synonym']):
+                for index in indices_for_placement:
+                    synonym = data_row[index]
+                    # Add row only if it's not empty
+                    if synonym and synonym not in synonym_list:
+                        self.conn.execute('''INSERT INTO synonyms(synonym)
+                                    VALUES (?)''', (synonym, ))
+                        synonym_list.append(synonym)
 
         # responses_to_synonyms table
         responses_to_synonyms_list = []
@@ -133,28 +135,30 @@ class Database:
                     response_id = response_list.index(response) + 1
 
                     # Get the synonym_id
-                    synonym = data_row[indices['synonym'][placement]]
+                    for index in indices['synonym'][placement]:
+                        synonym = data_row[index]
 
-                    if synonym:
-                        synonym_id = synonym_list.index(synonym) + 1
-                        pair = (response_id, synonym_id)
+                        if synonym:
+                            synonym_id = synonym_list.index(synonym) + 1
+                            pair = (response_id, synonym_id)
 
-                        if pair not in responses_to_synonyms_list:
-                            self.conn.execute('''INSERT INTO responses_to_synonyms(response_id, synonym_id)
-                                        VALUES (?,?)''', pair)
-                            responses_to_synonyms_list.append(pair)
+                            if pair not in responses_to_synonyms_list:
+                                self.conn.execute('''INSERT INTO responses_to_synonyms(response_id, synonym_id)
+                                                VALUES (?,?)''', pair)
+                                responses_to_synonyms_list.append(pair)
 
         # hints table
         hint_list = []
 
         for number, data_row in enumerate(data_list):
-            for index in indices['hint']:
-                hint = data_row[index]
-                # Add row only if it's not empty
-                if hint and hint not in hint_list:
-                    self.conn.execute('''INSERT INTO hints(hint)
-                                VALUES (?)''', (hint, ))
-                    hint_list.append(hint)
+            for placement, indices_for_placement in enumerate(indices['hint']):
+                for index in indices_for_placement:
+                    hint = data_row[index]
+                    # Add row only if it's not empty
+                    if hint and hint not in hint_list:
+                        self.conn.execute('''INSERT INTO hints(hint)
+                                    VALUES (?)''', (hint, ))
+                        hint_list.append(hint)
 
         # responses_to_hints table
         responses_to_hints_list = []
@@ -168,16 +172,17 @@ class Database:
                     response_id = response_list.index(response) + 1
 
                     # Get the hint_id
-                    hint = data_row[indices['hint'][placement]]
+                    for index in indices['hint'][placement]:
+                        hint = data_row[index]
 
-                    if hint:
-                        hint_id = hint_list.index(hint) + 1
-                        pair = (response_id, hint_id)
+                        if hint:
+                            hint_id = hint_list.index(hint) + 1
+                            pair = (response_id, hint_id)
 
-                        if pair not in responses_to_hints_list:
-                            self.conn.execute('''INSERT INTO responses_to_hints(response_id, hint_id)
-                                        VALUES (?,?)''', pair)
-                            responses_to_hints_list.append(pair)
+                            if pair not in responses_to_hints_list:
+                                self.conn.execute('''INSERT INTO responses_to_hints(response_id, hint_id)
+                                            VALUES (?,?)''', pair)
+                                responses_to_hints_list.append(pair)
 
         # tags table
         tag_list = []
