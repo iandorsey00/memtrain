@@ -11,6 +11,8 @@ from statistics import mean
 
 from settings import Settings
 from database import Database
+from question import Question
+from mtstatistics import MtStatistics
 
 import os
 
@@ -147,6 +149,8 @@ def train(args):
     csv_column_header_row_number = get_csv_column_header_row_number(csv_list)
     data_list = csv_list[csv_column_header_row_number+1:]
 
+    database.populate(indices, data_list)
+
     # Now, parse command line settings. #######################################
 
     # Set level, if one was specified:
@@ -205,32 +209,27 @@ def train(args):
                     aliases[get_key[:level].lower()] = get_key
 
     # Main training program ###################################################
-    cr_id_pairs = get_all_cue_response_id_pairs()
+    cr_id_pairs = database.get_all_cue_response_id_pairs()
 
     # Filter out other tags if tags were specified on the command line.
     if args.tags:
         these_response_ids = []
         args_tags = args.tags.split(',')
         for tag in args_tags:
-            these_response_ids += get_all_response_ids_by_tag(tag)
+            these_response_ids += database.get_all_response_ids_by_tag(tag)
         these_response_ids = list(set(these_response_ids))
         cr_id_pairs = [i for i in cr_id_pairs if i[1] in these_response_ids]
 
-    # List of times
-    times = []
-
-    # Inter-area margin for printing purposes
-    iam = ' '
+    mtstatistics = MtStatistics()
+    mtstatistics.total = len(cr_id_pairs)
 
     # If nquestions is not 0, add necessary responses or remove responses.
     nquestions = settings.settings['nquestions']
 
     if nquestions is not 0:
-        total = len(cr_id_pairs)
-
         # If nquestions is greater than the total number of questions,
         # duplicate them at random until nquestions is reached.
-        if nquestions > total:
+        if nquestions > mtstatistics.total:
             add = nquestions - total
             new_cr_id_pairs = list(cr_id_pairs)
 
@@ -240,7 +239,7 @@ def train(args):
             cr_id_pairs = list(new_cr_id_pairs)
         # If nquestions is less than the total number of questions, choose the
         # questions at random until we have another.
-        elif nquestions < total:
+        elif nquestions < mtstatistics.total:
             random.shuffle(cr_id_pairs)
             new_cr_id_pairs= []
             for i in range(nquestions):
@@ -253,42 +252,31 @@ def train(args):
     # Shuffle database
     random.shuffle(cr_id_pairs)
 
-    # Initialize statistics
-    correct = 0
-    incorrect = 0
-    response_number = 1
-    total = len(cr_id_pairs)
-
     # Raise NoResponsesError if there are no responses available.
-    if total == 0:
+    if mtstatistics.total == 0:
         raise NoResponsesError('There are no responses available that match the criteria.')
 
-    # Prompts #################################################################
-    user_input = None
-    elasped_time = None
-    incorrect_responses = []
-    valid_response = False
+    question = Question(settings, database)
 
-    # Print statistics ########################################################
-    decimal.getcontext().prec = 5
-    percentage = decimal.Decimal(correct) / decimal.Decimal(total) * decimal.Decimal(100)
+    for cr_id_pair in cr_id_pairs:
+        mtstatistics.is_input_valid = False
+        while not mtstatistics.is_input_valid:
+            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
 
-    question = new Question()
-
-    print_header()
-    print(settings.settings['title'])
-    print()
-    print('Training session complete.')
-    print()
-    print('Correct: ' + str(correct) + '/' + str(total) + ' (' + str(round(percentage, 1)) + '%)')
-    print('Average response time: ' + str(timedelta(seconds=mean(times))))
-    print()
-    if(incorrect > 0):
-        incorrect_responses_str = ', '.join(incorrect_responses)
-        f_incorrect_responses_str = textwrap.fill(incorrect_responses_str, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
-        print('Responses for which answers were incorrect:')
-        print()
-        print(f_incorrect_responses_str)
+    # print_header()
+    # print(settings.settings['title'])
+    # print()
+    # print('Training session complete.')
+    # print()
+    # print('Correct: ' + str(correct) + '/' + str(total) + ' (' + str(round(percentage, 1)) + '%)')
+    # print('Average response time: ' + str(timedelta(seconds=mean(times))))
+    # print()
+    # if(incorrect > 0):
+    #     incorrect_responses_str = ', '.join(incorrect_responses)
+    #     f_incorrect_responses_str = textwrap.fill(incorrect_responses_str, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
+    #     print('Responses for which answers were incorrect:')
+    #     print()
+    #     print(f_incorrect_responses_str)
 
 ###############################################################################
 # Argument parsing with argparse
