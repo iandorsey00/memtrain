@@ -111,7 +111,6 @@ class Database:
 
         # synonyms table
         synonym_list = []
-        print(indices['synonym'])
 
         for number, data_row in enumerate(data_list):
             for placement, indices_for_placement in enumerate(indices['synonym']):
