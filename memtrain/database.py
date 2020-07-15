@@ -231,7 +231,7 @@ class Database:
 
     def get_all_response_ids_by_tag(self, tag):
         self.cur.execute('''SELECT tag_id FROM tags
-                    WHERE tag = (?)''', (str(tag), ))
+                         WHERE tag = (?)''', (str(tag), ))
         rows = self.cur.fetchall()
         tag_id = rows[0][0]
         self.cur.execute('''SELECT response_id FROM responses_to_tags

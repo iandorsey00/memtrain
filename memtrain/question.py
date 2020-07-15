@@ -88,7 +88,7 @@ class Question:
         out = []
 
         for response_id in response_ids:
-            out.append(memtrain_get_value('response', response_id))
+            out.append(self.get_value('response', response_id))
 
         return out
 
@@ -115,7 +115,7 @@ class Question:
         return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
                                     subsequent_indent=' ' * 6, width=80)
 
-    def print_header(self):
+    def print_header(self, final=False):
         '''Print the question header.'''
 
         # Determine the level
@@ -130,18 +130,22 @@ class Question:
         print(('memtrain ' + self.settings.version).ljust(69) + self.iam + level.rjust(10))
         print()
 
-        # Print the second row - title and number of responses
-        title_block = self.settings.settings['title'].ljust(59)
-        responses_block = ('Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)).rjust(20)
+        if final:
+            # Just print the title
+            print(self.settings.settings['title'])
+        else:
+            # Print the second row - title and number of responses
+            title_block = self.settings.settings['title'].ljust(59)
+            responses_block = ('Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)).rjust(20)
 
-        print(title_block + self.iam + responses_block)
+            print(title_block + self.iam + responses_block)
 
-        # Print the third row if we are not on the first response - statistics
-        # regarding the number of problems right so far.
-        if self.mtstatistics.response_number is not 1:
-            label_block = 'Correct so far'.ljust(59)
-            statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
-            print(label_block + self.iam + statistics_block)
+            # Print the third row if we are not on the first response - statistics
+            # regarding the number of problems right so far.
+            if self.mtstatistics.response_number is not 1:
+                label_block = 'Correct so far'.ljust(59)
+                statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
+                print(label_block + self.iam + statistics_block)
 
     def generate_mchoices(self):
         '''Return the choices for the multiple choice questions'''
@@ -225,6 +229,8 @@ class Question:
         else:
             self.user_input = input('Enter response: ')
 
+        self.user_input = self.user_input.lower()
+
     def validate_input(self):
         if self.user_input in self.ascii_range:
             self.mtstatistics.is_input_valid = True
@@ -237,7 +243,7 @@ class Question:
             # For level 1, check to see if the right letter was entered.
             # First, translate the letter to its corresponding choice.
             self.user_input = self.mchoices[self.user_input]
-            self.mtstatistics.is_input_correct = self.response == self.user_input
+            self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower()
         elif self.settings.settings['level2'] or self.settings.settings['level3']:
             # For levels 2 or 3, make sure the right alias was entered.
             if self.user_input in aliases.keys():
@@ -253,6 +259,7 @@ class Question:
         else:
             print('Incorrect. Answer: ' + self.response)
             self.mtstatistics.number_incorrect += 1
+            self.mtstatistics.incorrect_responses.append(self.response)
 
         print()
 
@@ -265,9 +272,12 @@ class Question:
         is_last_question = self.cue_id == cue_id and self.response_id == response_id
 
         if not is_last_question:
-            self.cue = self.get_cue(cue_id)
-            self.response = self.get_response(response_id)
-            self.placement = self.get_placement(cue_id, response_id)
+            self.cue_id = cue_id
+            self.response_id = response_id
+
+            self.cue = self.get_cue(self.cue_id)
+            self.response = self.get_response(self.response_id)
+            self.placement = self.get_placement(self.cue_id, self.response_id)
             # hints = response_id_to_hints(response_id)
             self.mtags = self.get_mtags()
             mtstatistics.update_percentage()
@@ -307,15 +317,13 @@ class Question:
         elasped_time = end - start
 
         self.validate_input()
-        self.grade_input()
-
-        # Get elapsed time and add it to times.
-        self.mtstatistics.times.append(elasped_time)
 
         # Clear screen.
         os.system('clear')
 
-        if self.mtstatistics.is_input_valid:
+        if mtstatistics.is_input_valid:
+            self.grade_input()
+            self.mtstatistics.times.append(elasped_time)
             self.finalize()
         else:
             print('Please enter a valid response.')

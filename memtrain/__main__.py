@@ -260,23 +260,24 @@ def train(args):
 
     for cr_id_pair in cr_id_pairs:
         mtstatistics.is_input_valid = False
+
+        # Don't continue with the loop until a valid response has been
+        # entered.
         while not mtstatistics.is_input_valid:
             question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
 
-    # print_header()
-    # print(settings.settings['title'])
-    # print()
-    # print('Training session complete.')
-    # print()
-    # print('Correct: ' + str(correct) + '/' + str(total) + ' (' + str(round(percentage, 1)) + '%)')
-    # print('Average response time: ' + str(timedelta(seconds=mean(times))))
-    # print()
-    # if(incorrect > 0):
-    #     incorrect_responses_str = ', '.join(incorrect_responses)
-    #     f_incorrect_responses_str = textwrap.fill(incorrect_responses_str, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
-    #     print('Responses for which answers were incorrect:')
-    #     print()
-    #     print(f_incorrect_responses_str)
+    question.print_header(True)
+    print()
+    print('Training session complete.')
+    print()
+    print('Correct: ' + str(mtstatistics.number_correct) + '/' + str(mtstatistics.total) + ' (' + str(round(mtstatistics.percentage, 1)) + '%)')
+    print('Average response time: ' + str(timedelta(seconds=mean(mtstatistics.times))))
+    print()
+    if(mtstatistics.number_incorrect > 0):
+        print('Responses for which answers were incorrect:')
+        print()
+        print(mtstatistics.formatted_incorrect_responses())
+        print()
 
 ###############################################################################
 # Argument parsing with argparse
