@@ -1,6 +1,7 @@
 class Settings:
     '''Manage settings for memtrain'''
     def __init__(self):
+        self.version = '0.2a'
         self.settings = dict()
         self.all_labels = ['title', 'level1', 'level2', 'level3', 'alias',
         'nquestions']

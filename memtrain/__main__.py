@@ -5,16 +5,14 @@ import decimal
 import time
 import string
 import textwrap
-import sqlite3
 
 from datetime import timedelta
 from statistics import mean
 
 from settings import Settings
+from database import Database
 
 import os
-
-version = '0.2a'
 
 # SettingError ################################################################
 class SettingError(Exception):
@@ -96,7 +94,8 @@ def get_csv_column_indices(indices, csv_list):
     for row in csv_list:
         this_row = normalize_row(row)
         
-        # If a row contains 'Cue' and 'Response', it is designated as the column header row.
+        # If a row contains 'Cue' and 'Response', it is designated as the
+        # column header row.
         if is_header_row(this_row):
             indices['cue'] = get_index_mandatory(this_row, 'cue')
 
@@ -133,9 +132,7 @@ def train(args):
     # Initialize settings and database
     csv_list = load(args.csvfile)
     settings = Settings()
-
-    # Initialize SQLite
-    conn = sqlite3.connect(':memory:')
+    database = Database()
 
     # Initialize indices dictionary
     indices = dict()
@@ -149,242 +146,6 @@ def train(args):
     get_csv_column_indices(indices, csv_list)
     csv_column_header_row_number = get_csv_column_header_row_number(csv_list)
     data_list = csv_list[csv_column_header_row_number+1:]
-
-    # Create tables ###########################################################
-    conn.execute('''CREATE TABLE cues
-                 (cue_id INTEGER PRIMARY KEY,
-                 cue TEXT)''')
-
-    conn.execute('''CREATE TABLE responses
-                 (response_id INTEGER PRIMARY KEY,
-                 response TEXT)''')
-
-    conn.execute('''CREATE TABLE cues_to_responses
-                 (cue_id INTEGER,
-                 response_id INTEGER,
-                 placement INTEGER,
-                 PRIMARY KEY (cue_id, response_id))''')
-
-    conn.execute('''CREATE TABLE synonyms
-                 (synonym_id INTEGER PRIMARY KEY,
-                 synonym TEXT)''')
-
-    conn.execute('''CREATE TABLE responses_to_synonyms
-                 (response_id INTEGER,
-                 synonym_id INTEGER,
-                 PRIMARY KEY (response_id, synonym_id))''')
-
-    conn.execute('''CREATE TABLE tags
-                 (tag_id INTEGER PRIMARY KEY,
-                 tag TEXT)''')
-
-    conn.execute('''CREATE TABLE responses_to_tags
-                 (response_id INTEGER,
-                 tag_id INTEGER,
-                 PRIMARY KEY (response_id, tag_id))''')
-
-    conn.execute('''CREATE TABLE mtags
-                 (mtag_id INTEGER PRIMARY KEY,
-                 mtag TEXT)''')
-
-    conn.execute('''CREATE TABLE responses_to_mtags
-                 (response_id INTEGER,
-                 mtag_id INTEGER,
-                 PRIMARY KEY (response_id, mtag_id))''')
-
-    # Save changes
-    conn.commit()
-
-    # Populate the database with data #########################################
-
-    # cues table
-    cue_list = []
-
-    for data_row in data_list:
-        cue = data_row[indices['cue'][0]]
-        if cue not in cue_list:
-            conn.execute('''INSERT INTO cues(cue)
-                         VALUES (?)''', (cue, ))
-            cue_list.append(cue)
-
-    # responses table
-    response_list = []
-
-    for data_row in data_list:
-        for index in indices['response']:
-            response = data_row[index]
-            # Add response only if it's not empty and hasn't been added before.
-            if response and response not in response_list:
-                conn.execute('''INSERT INTO responses(response)
-                             VALUES (?)''', (response, ))
-                response_list.append(response)
-
-    # cues_to_response table
-    all_cues = []
-
-    for data_row in data_list:
-        # Get the cue_id
-        cue = data_row[indices['cue'][0]]
-        cue_id = cue_list.index(cue) + 1
-        
-        # Get the response_id
-        for placement, index in enumerate(indices['response']):
-            response = data_row[index]
-
-            if response:
-                response_id = response_list.index(response) + 1
-
-                # To determine placement, see if this cue has come up before.
-                all_cues.append(cue_id)
-                placement = len([i for i in all_cues if i == cue_id])
-
-                conn.execute('''INSERT INTO cues_to_responses(cue_id, response_id, placement)
-                            VALUES (?,?,?)''', (cue_id, response_id, placement))
-
-    # synonyms table
-    synonym_list = []
-
-    for number, data_row in enumerate(data_list):
-        for index in indices['synonym']:
-            synonym = data_row[index]
-            # Add row only if it's not empty
-            if synonym and synonym not in synonym_list:
-                conn.execute('''INSERT INTO synonyms(synonym)
-                             VALUES (?)''', (synonym, ))
-                synonym_list.append(synonym)
-
-    # responses_to_synonyms table
-    responses_to_synonyms_list = []
-
-    for data_row in data_list:
-        # Get the response_id
-        for placement, index in enumerate(indices['response']):
-            response = data_row[index]
-
-            if response:
-                response_id = response_list.index(response) + 1
-
-                # Get the synonym_id
-                synonym = data_row[indices['synonym'][placement]]
-
-                if synonym:
-                    synonym_id = synonym_list.index(synonym) + 1
-                    pair = (response_id, synonym_id)
-
-                    if pair not in responses_to_synonyms_list:
-                        conn.execute('''INSERT INTO responses_to_synonyms(response_id, synonym_id)
-                                    VALUES (?,?)''', pair)
-                        responses_to_synonyms_list.append(pair)
-
-    # tags table
-    tag_list = []
-
-    for number, data_row in enumerate(data_list):
-        for index in indices['tag']:
-            tag = data_row[index]
-            # Add row only if it's not empty
-            if tag and tag not in tag_list:
-                conn.execute('''INSERT INTO tags(tag)
-                             VALUES (?)''', (tag, ))
-                tag_list.append(tag)
-
-    # responses_to_tags table
-    responses_to_tag_list = []
-
-    for data_row in data_list:
-        # Get the response_id
-        for placement, index in enumerate(indices['response']):
-            response = data_row[index]
-
-            if response:
-                response_id = response_list.index(response) + 1
-
-                # Get the tag_id
-                # Only one tag placement per cue
-                for tag_index in indices['tag']:
-                    tag = data_row[tag_index]
-
-                    if tag:
-                        tag_id = tag_list.index(tag) + 1
-                        pair = (response_id, tag_id)
-
-                        if pair not in responses_to_tag_list:
-                            conn.execute('''INSERT INTO responses_to_tags(response_id, tag_id)
-                                        VALUES (?,?)''', pair)
-                            responses_to_tag_list.append(pair)
-
-    # mtags table
-    mtag_list = []
-
-    for number, data_row in enumerate(data_list):
-        for index in indices['mtag']:
-            mtag = data_row[index]
-            # Add row only if it's not empty
-            if mtag and mtag not in mtag_list:
-                conn.execute('''INSERT INTO mtags(mtag)
-                             VALUES (?)''', (mtag, ))
-                mtag_list.append(mtag)
-
-    # responses_to_mtags table
-    responses_to_mtag_list = []
-
-    for data_row in data_list:
-        # Get the response_id
-        for placement, index in enumerate(indices['response']):
-            response = data_row[index]
-
-            if response:
-                response_id = response_list.index(response) + 1
-
-                # Get the mtag_id
-                # Only one mtag placement per cue
-                for mtag_index in indices['mtag']:
-                    mtag = data_row[mtag_index]
-
-                    if mtag:
-                        mtag_id = mtag_list.index(mtag) + 1
-                        pair = (response_id, mtag_id)
-
-                        if pair not in responses_to_mtag_list:
-                            conn.execute('''INSERT INTO responses_to_mtags(response_id, mtag_id)
-                                        VALUES (?,?)''', pair)
-                            responses_to_mtag_list.append(pair)
-
-    # Save changes
-    conn.commit()
-
-    # Helper methods ##########################################################
-    def memtrain_query(columns, tables):
-        cur = conn.cursor()
-        cur.execute('''SELECT {} FROM {}'''.format(columns, tables))
-        rows = cur.fetchall()
-        columns = len(columns.split(','))
-        if columns == 1:
-            rows = list(map(lambda x: x[0], rows))
-
-        return rows
-
-    def get_all_responses():
-        return memtrain_query('response', 'responses')
-
-    def get_all_response_ids():
-        return memtrain_query('response_id', 'responses')
-
-    def get_all_response_ids_by_tag(tag):
-        cur = conn.cursor()
-        cur.execute('''SELECT tag_id FROM tags
-                     WHERE tag = (?)''', (str(tag), ))
-        rows = cur.fetchall()
-        tag_id = rows[0][0]
-        cur.execute('''SELECT response_id FROM responses_to_tags
-                     WHERE tag_id = (?)''', (str(tag_id), ))
-        rows = cur.fetchall()
-        rows = list(map(lambda x: x[0], rows))
-
-        return rows
-
-    def get_all_cue_response_id_pairs():
-        return memtrain_query('cue_id, response_id', 'cues_to_responses')
 
     # Now, parse command line settings. #######################################
 
@@ -422,7 +183,7 @@ def train(args):
             settings.settings['nquestions'] = args.nquestions
 
     # Get responses and aliases
-    responses = get_all_responses()
+    responses = database.get_all_responses()
     aliases = dict()
 
     # Map aliases to responses
@@ -502,204 +263,17 @@ def train(args):
     if total == 0:
         raise NoResponsesError('There are no responses available that match the criteria.')
 
-
     # Prompts #################################################################
     user_input = None
     elasped_time = None
     incorrect_responses = []
     valid_response = False
 
-    def render_question(cue_id, response_id):
-        user_input = None
-        elasped_time = None
-
-        cue = get_cue(cue_id)
-        response = get_response(response_id)
-        placement = get_placement(cue_id, response_id)
-        # hints = response_id_to_hints(response_id)
-        mtags = get_mtags(response_id)
-        # Get number of mtags
-        n_mtags = len(mtags)
-
-        # Format the cue
-        f_cue = cue.replace('{{}}', '_' * 9)
-
-        if placement == 1:
-            f_cue = f_cue.replace('{{1}}', '___(1)___')
-        else:
-            f_cue = f_cue.replace('{{1}}', '_' * 9)
-        if placement == 2:
-            f_cue = f_cue.replace('{{2}}', '___(2)___')
-        else:
-            f_cue = f_cue.replace('{{2}}', '_' * 9)
-        if placement == 3:
-            f_cue = f_cue.replace('{{3}}', '___(3)___')
-        else:
-            f_cue = f_cue.replace('{{3}}', '_' * 9)
-
-        f_cue = textwrap.fill(f_cue, initial_indent=' ' * 6, subsequent_indent=' ' * 6, width=80)
-
-        # Print how questions were answered correctly so far if we are not on
-        # the first question.
-        if response_number is not 1:
-            percentage = decimal.Decimal(correct) / decimal.Decimal(response_number-1) * decimal.Decimal(100)
-
-        # Determine the level
-        if settings.settings['level1']:
-            level = 'Level 1'
-        elif settings.settings['level2']:
-            level = 'Level 2'
-        elif settings.settings['level3']:
-            level = 'Level 3'
-
-        def print_header():
-            # Print the program header.
-            print(('memtrain '+ version).ljust(69) + iam + level.rjust(10))
-            print()
-
-        print_header()
-
-        # Print first two rows and the cue.
-        print(settings.settings['title'].ljust(59) + iam + ('Response ' + str(response_number) + '/' + str(total)).rjust(20))
-        if response_number is not 1:
-            print('Correct so far'.ljust(59) + iam + (str(correct) + '/' + str(response_number-1) + ' (' + str(round(percentage, 1)) + '%)').rjust(20))
-        print()
-        print(f_cue)
-        print()
-
-        # If on level one, generate the multiple choice questions.
-        if settings.settings['level1']:
-            # Get responses for all mtags for this response
-            same_mtag_responses = []
-
-            for mtag in mtags:
-                same_mtag_responses += get_responses_by_mtag(mtag)
-
-            # Get responses of the same and the other plurality
-            plurality = is_plural(response)
-
-            same_plurality_responses = list(plural_responses) if plurality else list(nonplural_responses)
-            other_plurality_responses = list(nonplural_responses) if plurality else list(plural_responses)
-
-            # We will select first from same_mtag_responses. Then, if
-            # that's empty, we'll select from same_plurality_responses. If
-            # that's also empty, we'll resort to other_plurality_responses.
-
-            # Filter all three of these lists to make sure they don't contain
-            # the correct response
-            same_mtag_responses = [i for i in same_mtag_responses if i != response]
-            same_plurality_responses = [i for i in same_plurality_responses if i != response]
-            # The response won't be located in other_plurality_responses.
-
-            # Filter the pluarlity_responses lists
-            same_plurality_responses = [i for i in same_plurality_responses if i not in same_mtag_responses]
-            other_plurality_responses = [i for i in other_plurality_responses if i not in same_mtag_responses]
-
-            # Shuffle the response lists.
-            random.shuffle(same_mtag_responses)
-            random.shuffle(same_plurality_responses)
-            random.shuffle(other_plurality_responses)
-
-            # Get our ascii range for the multiple choice questions
-            ascii_range = string.ascii_lowercase[:4]
-            # Get the index of the correct answer.
-            correct_letter = random.choice(ascii_range)
-
-            response_pool_consumption_index = 0
-            response_pool = same_mtag_responses
-
-            # Loop through the ascii range
-            for i in ascii_range:
-                # If we have the correct letter, output the correct response.
-                if i == correct_letter:
-                    this_response = response
-                # Otherwise...
-                else:
-                    # If the response_pool is empty...
-                    while len(response_pool) == 0:
-                        response_pool_consumption_index = response_pool_consumption_index + 1
-
-                        if response_pool_consumption_index == 1:
-                            response_pool = same_plurality_responses
-                        elif response_pool_consumption_index == 2:
-                            response_pool = other_plurality_responses
-                        elif response_pool_consumption_index > 2:
-                            raise NoResponsesError('There are no more responses available.')
-
-                    this_response = response_pool.pop()
-                # Capitalize only the first letter of this_response
-                this_response = this_response[0].upper() + this_response[1:]
-                # Now that we have our response, print it
-                f_response = textwrap.fill(this_response, initial_indent=i + ')' + ' ' * 4, subsequent_indent=' ' * 6, width=80)
-                print(f_response)
-
-            print()
-        
-        elif settings.settings['level2']:
-            for hint in hints:
-                # Print hint only if it is not empty.
-                if len(hint) != 0:
-                    # Format hint to match cue.
-                    f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
-                    print(f_hint)
-                    print()
-
-        # Start time
-        start = time.time()
-        # Prompt for a response choice
-        if settings.settings['level1']:
-            user_input = input('Enter response choice: ')
-        else:
-            user_input = input('Enter response: ')
-
-        user_input = user_input.lower()
-
-        # End time
-        end = time.time()
-        elasped_time = end - start
-
-        if user_input in [char for char in ascii_range]:
-            valid_response = True
-
-    for cue_id, response_id in cr_id_pairs:
-        while not valid_response:
-            render_question(cue_id, response_id)
-            if not valid_response:
-                os.system('clear')
-                print('Please enter a valid response.')
-                print()
-
-        # Get elapsed time and add it to times.
-        times.append(elasped_time)
-        print()
-        # Clear screen.
-        os.system('clear')
-
-        # Validate input.
-        if settings.settings['level1']:
-            # For level 1, check to see if the right letter was entered.
-            correct_user_input = correct_letter == user_input
-        elif settings.settings['level2'] or settings.settings['level3']:
-            # For levels 2 or 3, make sure the right alias was entered.
-            if user_input in aliases.keys():
-                correct_user_input = response.lower() == user_input.lower() or response == aliases[user_input.lower()]
-            else:
-                correct_user_input = response.lower() == user_input.lower()
-
-        # Perform actions based on correctness.
-        if correct_user_input:
-            print('Correct.')
-            correct = correct + 1
-        else:
-            print('Incorrect. Answer: ' + response)
-            incorrect = incorrect + 1
-            incorrect_responses += response
-        print()
-        response_number = response_number + 1 
-
     # Print statistics ########################################################
     decimal.getcontext().prec = 5
     percentage = decimal.Decimal(correct) / decimal.Decimal(total) * decimal.Decimal(100)
+
+    question = new Question()
 
     print_header()
     print(settings.settings['title'])
