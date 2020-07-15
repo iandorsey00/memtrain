@@ -307,7 +307,7 @@ class Question:
 
         # Is there an alias?
         if self.user_input in self.aliases.keys():
-            if self.aliases[user_input] == self.user_input:
+            if self.aliases[self.user_input] == self.user_input:
                 self.mtstatistics.is_input_correct = True
         
         # If not, does the input match the response?
