@@ -299,6 +299,8 @@ class Question:
         out = out.replace('–', '')
         out = out.replace('—', '')
 
+        return out
+
     def determine_equivalence(self):
         '''See if input matches an alias, synonym, or standarized string'''
         self.mtstatistics.is_input_correct = False
@@ -378,6 +380,8 @@ class Question:
         print()
 
         self.mtstatistics.response_number += 1
+
+        # Reset
         self.mtstatistics.used_synonym = ''
 
     def render_question(self, cue_id, response_id, mtstatistics, aliases):
