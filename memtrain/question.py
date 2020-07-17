@@ -114,7 +114,7 @@ class Question:
             self.cur.execute('''SELECT response_id FROM responses_to_mtags
                              WHERE mtag_id = (?)''', (mtag_id, ))
             rows = self.cur.fetchall()
-            response_ids.append(rows[0][0])
+            response_ids = list(map(lambda x: x[0], rows))
 
         # Translate response_id to response
         out = []
