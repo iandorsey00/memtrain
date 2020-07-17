@@ -267,6 +267,8 @@ def train(args):
         while not mtstatistics.is_input_valid:
             question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics, aliases)
 
+    mtstatistics.update_percentage()
+
     question.print_header(True)
     print()
     print('Training session complete.')

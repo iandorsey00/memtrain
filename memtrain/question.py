@@ -113,8 +113,8 @@ class Question:
         for mtag_id in rows:
             self.cur.execute('''SELECT response_id FROM responses_to_mtags
                              WHERE mtag_id = (?)''', (mtag_id, ))
-            rows = self.cur.fetchall()
-            response_ids = list(map(lambda x: x[0], rows))
+            more_rows = self.cur.fetchall()
+            response_ids += list(map(lambda x: x[0], more_rows))
 
         # Translate response_id to response
         out = []
