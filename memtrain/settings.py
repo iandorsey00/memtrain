@@ -3,11 +3,10 @@ class Settings:
     def __init__(self):
         self.version = '0.2a'
         self.settings = dict()
-        self.all_labels = ['title', 'level1', 'level2', 'level3', 'alias',
-        'nquestions']
+        self.all_labels = ['title', 'level1', 'level2', 'level3', 'nquestions']
 
         ## Boolean settings
-        self.boolean_labels = ['level1', 'level2', 'level3', 'alias']
+        self.boolean_labels = ['level1', 'level2', 'level3']
 
         ### Levels
 
@@ -17,11 +16,6 @@ class Settings:
         self.settings['level2'] = True
         # Level 3 - Respond on your own
         self.settings['level3'] = True
-
-        ### Alias
-
-        # Alias
-        self.settings['alias'] = True
 
         ## Integer settings
         self.integer_labels = ['nquestions']

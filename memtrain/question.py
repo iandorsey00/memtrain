@@ -23,7 +23,6 @@ class Question:
         self.mchoices = []
 
         self.mtstatistics = None
-        self.aliases = []
 
         self.iam = ' '
         self.ascii_range = ['a', 'b', 'c', 'd']
@@ -302,13 +301,8 @@ class Question:
         return out
 
     def determine_equivalence(self):
-        '''See if input matches an alias, synonym, or standarized string'''
+        '''See if input matches a synonym or standarized string'''
         self.mtstatistics.is_input_correct = False
-
-        # Is there an alias?
-        if self.user_input in self.aliases.keys():
-            if self.aliases[self.user_input] == self.user_input:
-                self.mtstatistics.is_input_correct = True
         
         # If not, does the input match the response?
         std_input = self.standardize_string(self.user_input)
@@ -334,7 +328,7 @@ class Question:
             self.user_input = self.mchoices[self.user_input]
             self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower()
         elif self.settings.settings['level2'] or self.settings.settings['level3']:
-            # For levels 2 or 3, make sure the right alias was entered.
+            # For levels 2 or 3, make sure the right input was entered.
             self.determine_equivalence()
     
     def finalize(self):
@@ -384,10 +378,9 @@ class Question:
         # Reset
         self.mtstatistics.used_synonym = ''
 
-    def render_question(self, cue_id, response_id, mtstatistics, aliases):
+    def render_question(self, cue_id, response_id, mtstatistics):
         '''Render the question'''
         self.mtstatistics = mtstatistics
-        self.aliases = aliases
 
         is_last_question = self.cue_id == cue_id and self.response_id == response_id
 

@@ -187,27 +187,8 @@ def train(args):
         else:
             settings.settings['nquestions'] = args.nquestions
 
-    # Get responses and aliases
+    # Get responses
     responses = database.get_all_responses()
-    aliases = dict()
-
-    # Map aliases to responses
-    if settings.settings['alias']:
-        unique_responses = list(set(responses))
-        for unique_response in unique_responses:
-            lc_unique_response = unique_response.lower()
-            level = 1
-            complete = False
-            while not complete:
-                proposed_key = lc_unique_response[:level]
-                if proposed_key not in aliases.keys():
-                    aliases[proposed_key] = unique_response
-                    level = 1
-                    complete = True
-                else:
-                    get_key = aliases.pop(proposed_key)
-                    level = level + 1
-                    aliases[get_key[:level].lower()] = get_key
 
     # Main training program ###################################################
     cr_id_pairs = database.get_all_cue_response_id_pairs()
@@ -265,7 +246,7 @@ def train(args):
         # Don't continue with the loop until a valid response has been
         # entered.
         while not mtstatistics.is_input_valid:
-            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics, aliases)
+            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
 
     mtstatistics.update_percentage()
 
