@@ -193,14 +193,23 @@ def train(args):
     # Main training program ###################################################
     cr_id_pairs = database.get_all_cue_response_id_pairs()
 
-    # Filter out other tags if tags were specified on the command line.
-    if args.tags:
+    # Get response IDs for multiple tags
+    def get_all_response_ids_for_tags(tags):
         these_response_ids = []
-        args_tags = args.tags.split(',')
+        args_tags = tags.split(',')
         for tag in args_tags:
             these_response_ids += database.get_all_response_ids_by_tag(tag)
-        these_response_ids = list(set(these_response_ids))
+        return list(set(these_response_ids))
+
+    # Filter out other tags if tags were specified on the command line.
+    if args.tags:
+        these_response_ids = get_all_response_ids_for_tags(args.tags)
         cr_id_pairs = [i for i in cr_id_pairs if i[1] in these_response_ids]
+
+    # Remove tags if no-tags were specified on the command line.
+    if args.not_tags:
+        these_response_ids = get_all_response_ids_for_tags(args.not_tags)
+        cr_id_pairs = [i for i in cr_id_pairs if i[1] not in these_response_ids]
 
     mtstatistics = MtStatistics()
     mtstatistics.total = len(cr_id_pairs)
@@ -272,7 +281,8 @@ parser = argparse.ArgumentParser(
 parser.set_defaults(func=train)
 
 # Create arguments
-parser.add_argument('-t', '--tags', help='Study these tags only')
+parser.add_argument('-t', '--tags', help='Train these tags only')
+parser.add_argument('-x', '--not-tags', help='Do not train these tags')
 parser.add_argument('-l', '--level', help='Specify which level to study')
 parser.add_argument('-n', '--nquestions', type=int, help='Set the number of questions for this session')
 parser.add_argument('csvfile', help='The CSV file to load')
