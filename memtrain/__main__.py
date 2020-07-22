@@ -206,7 +206,7 @@ def train(args):
         these_response_ids = get_all_response_ids_for_tags(args.tags)
         cr_id_pairs = [i for i in cr_id_pairs if i[1] in these_response_ids]
 
-    # Remove tags if no-tags were specified on the command line.
+    # Remove tags if not-tags were specified on the command line.
     if args.not_tags:
         these_response_ids = get_all_response_ids_for_tags(args.not_tags)
         cr_id_pairs = [i for i in cr_id_pairs if i[1] not in these_response_ids]
