@@ -221,13 +221,14 @@ def train(args):
         # If nquestions is greater than the total number of questions,
         # duplicate them at random until nquestions is reached.
         if nquestions > mtstatistics.total:
-            add = nquestions - total
+            add = nquestions - mtstatistics.total
             new_cr_id_pairs = list(cr_id_pairs)
 
             for i in range(add):
-                new_response_ids.append(random.choice(cr_id_pairs))
+                new_cr_id_pairs.append(random.choice(cr_id_pairs))
             
             cr_id_pairs = list(new_cr_id_pairs)
+            mtstatistics.total = len(cr_id_pairs)
         # If nquestions is less than the total number of questions, choose the
         # questions at random until we have another.
         elif nquestions < mtstatistics.total:
@@ -237,6 +238,7 @@ def train(args):
                 new_cr_id_pairs.append(cr_id_pairs[i])
             
             cr_id_pairs = list(new_cr_id_pairs)
+            mtstatistics.total = len(cr_id_pairs)
         # If nquestions is equal to the total number of questions, don't do
         # anything.
 
