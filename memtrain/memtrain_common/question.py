@@ -430,7 +430,7 @@ class Question:
         self.validate_input()
 
         # Clear screen.
-        os.system('clear')
+        os.system('cls')
 
         if mtstatistics.is_input_valid:
             self.grade_input()
