@@ -6,6 +6,9 @@ import time
 
 import os
 
+class NoResponsesError(Exception):
+    pass
+
 class Question:
     '''Manages the current cue and response interface'''
     def __init__(self, settings, database):
@@ -173,7 +176,7 @@ class Question:
 
             # Print the third row if we are not on the first response - statistics
             # regarding the number of problems right so far.
-            if self.mtstatistics.response_number is not 1:
+            if self.mtstatistics.response_number != 1:
                 label_block = 'Correct so far'.ljust(59)
                 statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
                 print(label_block + self.iam + statistics_block)

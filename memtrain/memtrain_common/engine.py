@@ -9,10 +9,10 @@ import textwrap
 from datetime import timedelta
 from statistics import mean
 
-from settings import Settings
-from database import Database
-from question import Question
-from mtstatistics import MtStatistics
+from memtrain.memtrain_common.settings import Settings
+from memtrain.memtrain_common.database import Database
+from memtrain.memtrain_common.question import Question
+from memtrain.memtrain_common.mtstatistics import MtStatistics
 
 import os
 
@@ -188,7 +188,7 @@ def train(args):
             settings.settings['nquestions'] = args.nquestions
 
     # Get responses
-    responses = database.get_all_responses()
+    # responses = database.get_all_responses()
 
     # Main training program ###################################################
     cr_id_pairs = database.get_all_cue_response_id_pairs()
@@ -217,7 +217,7 @@ def train(args):
     # If nquestions is not 0, add necessary responses or remove responses.
     nquestions = settings.settings['nquestions']
 
-    if nquestions is not 0:
+    if nquestions != 0:
         # If nquestions is greater than the total number of questions,
         # duplicate them at random until nquestions is reached.
         if nquestions > mtstatistics.total:
