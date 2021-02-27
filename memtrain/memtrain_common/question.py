@@ -37,6 +37,12 @@ class Question:
         self.plural_responses = [i for i in self.responses if self.is_plural(i)]
         self.nonplural_responses = [i for i in self.responses if not self.is_plural(i)]
 
+        ## Interface text
+        self.title_text = ''
+        self.level_text = ''
+        self.response_number_text = ''
+        self.cue_text = ''
+
     def get_value(self, value, value_id):
         self.cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''
                          .format(value, value + 's', value + '_id'),
@@ -149,19 +155,19 @@ class Question:
         return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
                                     subsequent_indent=' ' * 6, width=80)
 
-    def print_header(self, final=False):
-        '''Print the question header.'''
+    def header_text(self, final=False):
+        '''Get header text'''
 
         # Determine the level
         if self.settings.settings['level1']:
-            level = 'Level 1'
+            self.level_text = 'Level 1'
         elif self.settings.settings['level2']:
-            level = 'Level 2'
+            self.level_text = 'Level 2'
         elif self.settings.settings['level3']:
-            level = 'Level 3'
+            self.level_text = 'Level 3'
 
         # Print the first row - version and level
-        print(('memtrain ' + self.settings.version).ljust(69) + self.iam + level.rjust(10))
+        print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.level_text.rjust(10))
         print()
 
         if final:
@@ -170,7 +176,8 @@ class Question:
         else:
             # Print the second row - title and number of responses
             title_block = self.settings.settings['title'].ljust(59)
-            responses_block = ('Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)).rjust(20)
+            self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+            responses_block = (self.response_number_text).rjust(20)
 
             print(title_block + self.iam + responses_block)
 
@@ -403,9 +410,10 @@ class Question:
             if self.settings.settings['level1']:
                 self.mchoices = self.generate_mchoices()
 
-        self.print_header()
+        self.header_text()
 
         self.f_cue = self.format_cue()
+        self.cue_text = self.f_cue
         print()
         print(self.f_cue)
         print()
