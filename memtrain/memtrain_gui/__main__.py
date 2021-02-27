@@ -55,6 +55,7 @@ class memtrain_gui:
 
         self.button = tk.Button(master=self.bottom, text='Go', bg='green', fg='white', padx=10)
         self.button.grid(column=1, row=0)
+        self.button.bind('<Return>')
 
         self.bottom.pack(fill=tk.X)
 
