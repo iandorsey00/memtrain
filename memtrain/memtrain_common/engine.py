@@ -165,7 +165,7 @@ class Engine:
         '''Load the CSV file'''
         out = []
 
-        with open(csvfile) as cf:
+        with open(csvfile, encoding='utf-8') as cf:
             csvreader = csv.reader(cf)
             for row in csvreader:
                 out.append(row)
