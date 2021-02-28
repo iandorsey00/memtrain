@@ -152,8 +152,10 @@ class Question:
         else:
             self.f_cue = self.f_cue.replace('{{3}}', '_' * 9)
 
-        return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
-                                    subsequent_indent=' ' * 6, width=80)
+        # return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
+        #                           subsequent_indent=' ' * 6, width=80)
+
+        return self.f_cue
 
     def main_data_loop(self, cue_id, response_id, mtstatistics, final=False):
         '''Get header text'''
@@ -179,7 +181,8 @@ class Question:
             self.level_text = 'Level 3'
 
         self.title_text = self.settings.settings['title']
-        self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+        self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + ' of ' + str(self.mtstatistics.total)
+        self.correct_so_far_text = str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' · ' + str(round(self.mtstatistics.percentage, 1)) + '%'
         self.cue_text = self.format_cue()
 
         # Print the first row - version and level
