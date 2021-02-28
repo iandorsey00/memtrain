@@ -8,7 +8,6 @@ import textwrap
 
 from memtrain.memtrain_common.settings import Settings
 from memtrain.memtrain_common.database import Database
-from memtrain.memtrain_common.question import Question
 from memtrain.memtrain_common.mtstatistics import MtStatistics
 
 import os
@@ -115,7 +114,7 @@ class Engine:
             cr_id_pairs = [i for i in cr_id_pairs if i[1] not in these_response_ids]
 
         self.mtstatistics = MtStatistics()
-        self.mtstatistics.total = len(cr_id_pairs)
+        self.mtstatistics.total = len(self.cr_id_pairs)
 
         # If nquestions is not 0, add necessary responses or remove responses.
         nquestions = self.settings.settings['nquestions']
@@ -140,13 +139,13 @@ class Engine:
                 for i in range(nquestions):
                     new_cr_id_pairs.append(cr_id_pairs[i])
                 
-                cr_id_pairs = list(new_cr_id_pairs)
+                self.cr_id_pairs = list(new_cr_id_pairs)
                 self.mtstatistics.total = len(cr_id_pairs)
             # If nquestions is equal to the total number of questions, don't do
             # anything.
 
         # Shuffle database
-        random.shuffle(cr_id_pairs)
+        random.shuffle(self.cr_id_pairs)
 
         # Raise NoResponsesError if there are no responses available.
         if self.mtstatistics.total == 0:

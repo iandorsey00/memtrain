@@ -1,10 +1,25 @@
 import tkinter as tk
 
-class memtrain_gui:
+from datetime import timedelta
+from statistics import mean
+
+from memtrain.memtrain_common.engine import Engine
+from memtrain.memtrain_common.question import Question
+
+class MemtrainGUI:
     def __init__(self):
         '''Construct the GUI interface'''
         self.root = tk.Tk()
         self.root.title('memtrain v0.3a')
+
+        self.engine = Engine('C:/Users/iando/Desktop/animals.csv', '3', '', '', '')
+
+        self.settings = self.engine.settings
+        self.database = self.engine.database
+        self.mtstatistics = self.engine.mtstatistics
+        self.cr_id_pairs = self.engine.cr_id_pairs
+
+        self.question = Question(self.settings, self.database)
 
         # Upper area ##########################################################
         self.upper = tk.Frame(master=self.root)
@@ -13,28 +28,28 @@ class memtrain_gui:
 
         self.title = tk.Frame(master=self.upper)
         self.title.grid(column=0, row=0, sticky='nsew', rowspan=2)
-        self.title_label = tk.Label(master=self.title, text='Test title', anchor='w')
+        self.title_label = tk.Label(master=self.title, anchor='w')
         self.title_label.pack(fill=tk.BOTH, expand=tk.YES)
 
         self.level = tk.Frame(master=self.upper)
         self.level.grid(column=1, row=0, sticky='nsew')
-        self.level_label = tk.Label(master=self.level, text='Level 3', anchor='e')
+        self.level_label = tk.Label(master=self.level, anchor='e')
         self.level_label.pack(fill=tk.X)
 
-        self.total = tk.Frame(master=self.upper)
-        self.total.grid(column=1, row=1, sticky='nsew')
-        self.total_label = tk.Label(master=self.total, text='Response 1/25', anchor='e')
-        self.total_label.pack(fill=tk.X)
+        self.response_number = tk.Frame(master=self.upper)
+        self.response_number.grid(column=1, row=1, sticky='nsew')
+        self.response_number_label = tk.Label(master=self.response_number, anchor='e')
+        self.response_number_label.pack(fill=tk.X)
 
         self.upper.pack(fill=tk.X, expand=tk.YES)
 
         # Middle area #########################################################
         self.middle = tk.Frame(master=self.root)
 
-        self.question = tk.Text(master=self.middle, width=75, height=8)
-        self.question.configure(font=('Arial', 10))
-        self.question.insert(tk.END, 'This is the text of the question.')
-        self.question.pack()
+        self.cue_text_widget = tk.Text(master=self.middle, width=75, height=8)
+        self.cue_text_widget.configure(font=('Arial', 10))
+        self.cue_text_widget.insert(tk.END, 'This is the text of the question.')
+        self.cue_text_widget.pack()
 
         self.middle.pack()
 
@@ -84,8 +99,30 @@ class memtrain_gui:
         if(self.response_placeholder == True):
             self.response.icursor(0)
 
-    def activate_mainloop(self):
+    def set_cue_text_widget_content(self, content):
+        self.cue_text_widget.delete(1.0, tk.END)
+        self.cue_text_widget.insert(tk.END, content)
+
+    def data_mainloop(self):
+        # Data processing #####################################################
+        self.question.main_data_loop(self.cr_id_pairs[0][0], self.cr_id_pairs[0][1], self.mtstatistics)
+
+        self.title_label.configure(text=self.question.title_text)
+        self.level_label.configure(text=self.question.level_text)
+        self.response_number_label.configure(text=self.question.response_number_text)
+        self.set_cue_text_widget_content(self.question.cue_text)
+        # for cr_id_pair in self.cr_id_pairs:
+            # self.mtstatistics.is_input_valid = False
+
+            # Don't continue with the loop until a valid response has been
+            # entered.
+            # while not self.mtstatistics.is_input_valid:
+
+                # input('Press Enter to continue.')
+
+    def tk_mainloop(self):
         self.root.mainloop()
 
-mtgui = memtrain_gui()
-mtgui.activate_mainloop()
+mtgui = MemtrainGUI()
+mtgui.data_mainloop()
+mtgui.tk_mainloop()

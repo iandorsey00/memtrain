@@ -6,6 +6,8 @@ import time
 
 import os
 
+from memtrain.memtrain_common.mtstatistics import MtStatistics
+
 class NoResponsesError(Exception):
     pass
 
@@ -24,8 +26,6 @@ class Question:
         self.f_cue = ''
         self.mtags = []
         self.mchoices = []
-
-        self.mtstatistics = None
 
         self.iam = ' '
         self.ascii_range = ['a', 'b', 'c', 'd']
@@ -155,8 +155,20 @@ class Question:
         return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
                                     subsequent_indent=' ' * 6, width=80)
 
-    def header_text(self, final=False):
+    def main_data_loop(self, cue_id, response_id, mtstatistics, final=False):
         '''Get header text'''
+
+        self.cue_id = cue_id
+        self.response_id = response_id
+        self.mtstatistics = mtstatistics
+
+        self.cue = self.get_cue(self.cue_id)
+        self.response = self.get_response(self.response_id)
+        self.placement = self.get_placement(self.cue_id, self.response_id)
+        self.synonyms = self.get_synonyms()
+        self.hints = self.get_hints()
+        self.mtags = self.get_mtags()
+        self.mtstatistics.update_percentage()
 
         # Determine the level
         if self.settings.settings['level1']:
@@ -166,27 +178,33 @@ class Question:
         elif self.settings.settings['level3']:
             self.level_text = 'Level 3'
 
+        self.title_text = self.settings.settings['title']
+        self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+        self.cue_text = self.format_cue()
+
         # Print the first row - version and level
-        print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.level_text.rjust(10))
-        print()
+        # print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.level_text.rjust(10))
+        # print()
 
         if final:
             # Just print the title
-            print(self.settings.settings['title'])
+            # print(self.settings.settings['title'])
+            pass
         else:
             # Print the second row - title and number of responses
-            title_block = self.settings.settings['title'].ljust(59)
-            self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
-            responses_block = (self.response_number_text).rjust(20)
+            # title_block = self.settings.settings['title'].ljust(59)
+            # self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+            # responses_block = (self.response_number_text).rjust(20)
 
-            print(title_block + self.iam + responses_block)
+            # print(title_block + self.iam + responses_block)
 
             # Print the third row if we are not on the first response - statistics
             # regarding the number of problems right so far.
-            if self.mtstatistics.response_number != 1:
-                label_block = 'Correct so far'.ljust(59)
-                statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
-                print(label_block + self.iam + statistics_block)
+            # if self.mtstatistics.response_number != 1:
+                # label_block = 'Correct so far'.ljust(59)
+                # statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
+                # print(label_block + self.iam + statistics_block)
+            pass
 
     def generate_mchoices(self):
         '''Return the choices for the multiple choice questions'''
@@ -254,21 +272,6 @@ class Question:
             out[i] = this_response
 
         return out
-
-    def print_hints(self):
-        for hint in self.hints:
-            if hint:
-                # Format hint to match cue.
-                f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
-                print(f_hint)
-
-    def print_mchoices(self):
-        '''Print the multiple choices for Level 1'''
-        for letter, choice in self.mchoices.items():
-            this_line = textwrap.fill(choice,
-                                      initial_indent=letter + ')' + (' ' * 4),
-                                      subsequent_indent=' ' * 6, width=80)
-            print(this_line)
 
     def prompt_for_response(self):
         '''Prompt for a response and return user input'''
@@ -387,64 +390,4 @@ class Question:
 
         # Reset
         self.mtstatistics.used_synonym = ''
-
-    def render_question(self, cue_id, response_id, mtstatistics):
-        '''Render the question'''
-        self.mtstatistics = mtstatistics
-
-        is_last_question = self.cue_id == cue_id and self.response_id == response_id
-
-        if not is_last_question:
-            self.cue_id = cue_id
-            self.response_id = response_id
-
-            self.cue = self.get_cue(self.cue_id)
-            self.response = self.get_response(self.response_id)
-            self.placement = self.get_placement(self.cue_id, self.response_id)
-            self.synonyms = self.get_synonyms()
-            self.hints = self.get_hints()
-            self.mtags = self.get_mtags()
-            self.mtstatistics.update_percentage()
-
-            # If on Level 1, generate the multiple choice questions.
-            if self.settings.settings['level1']:
-                self.mchoices = self.generate_mchoices()
-
-        self.header_text()
-
-        self.f_cue = self.format_cue()
-        self.cue_text = self.f_cue
-        print()
-        print(self.f_cue)
-        print()
-
-        if self.settings.settings['level1']:
-            self.print_mchoices()
-            print()
-        elif self.settings.settings['level2']:
-            self.print_hints()
-            print()
-
-        # Start time
-        start = time.time()
-
-        # Prompt for user input
-        self.prompt_for_response()
-
-        # End time
-        end = time.time()
-        elasped_time = end - start
-
-        self.validate_input()
-
-        # Clear screen.
-        os.system('cls')
-
-        if mtstatistics.is_input_valid:
-            self.grade_input()
-            self.mtstatistics.times.append(elasped_time)
-            self.finalize()
-        else:
-            print('Please enter a valid response.')
-            print()
     
