@@ -116,6 +116,64 @@ def train(args):
     #         print('Please enter a valid response.')
     #         print()
 
+    
+
+    # def prompt_for_response(self):
+    #     '''Prompt for a response and return user input'''
+    #     if self.settings.settings['level1']:
+    #         self.user_input = input('Enter response choice: ')
+    #     else:
+    #         self.user_input = input('Enter response: ')
+
+    #     self.user_input = self.user_input.lower()
+
+    # def finalize(self):
+    #     '''Notify the user of correctness, update statistics, and print'''
+    #     if self.mtstatistics.is_input_correct:
+    #         self.mtstatistics.number_correct += 1
+    #         if self.mtstatistics.has_synonym_been_used():
+    #             remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
+    #             default_answer_str = 'Correct. Default answer: ' + self.response
+    #             other_correct_responses_str = 'Other correct responses: ' + ', '.join(remaining_synonyms)
+    #             f_default_answer_str = textwrap.fill(default_answer_str, width=80)
+    #             f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+
+    #             print(f_default_answer_str)
+
+    #             if remaining_synonyms:
+    #                 print(f_other_correct_responses_str)
+    #             else:
+    #                 print()
+    #         else:
+    #             print('Correct.')
+    #             other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+    #             f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+
+    #             if self.synonyms:
+    #                 print(f_other_correct_responses_str)
+    #             else:
+    #                 print()
+
+    #     else:
+    #         self.mtstatistics.number_incorrect += 1
+    #         self.mtstatistics.incorrect_responses.append(self.response)
+    #         print('Incorrect. Answer: ' + self.response)
+
+    #         other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+    #         f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+            
+    #         if self.synonyms:
+    #             print(f_other_correct_responses_str)
+    #         else:
+    #             print()
+
+    #     print()
+
+    #     self.mtstatistics.response_number += 1
+
+    #     # Reset
+    #     self.mtstatistics.used_synonym = ''
+
 ###############################################################################
 # Argument parsing with argparse
 

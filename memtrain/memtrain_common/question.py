@@ -42,6 +42,8 @@ class Question:
         self.level_text = ''
         self.response_number_text = ''
         self.cue_text = ''
+        self.correctness_str = ''
+        self.other_answers_str = ''
 
     def get_value(self, value, value_id):
         self.cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''
@@ -276,15 +278,6 @@ class Question:
 
         return out
 
-    def prompt_for_response(self):
-        '''Prompt for a response and return user input'''
-        if self.settings.settings['level1']:
-            self.user_input = input('Enter response choice: ')
-        else:
-            self.user_input = input('Enter response: ')
-
-        self.user_input = self.user_input.lower()
-
     def validate_input(self):
         self.mtstatistics.is_input_valid = False
 
@@ -352,42 +345,29 @@ class Question:
         if self.mtstatistics.is_input_correct:
             self.mtstatistics.number_correct += 1
             if self.mtstatistics.has_synonym_been_used():
-                remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
-                default_answer_str = 'Correct. Default answer: ' + self.response
-                other_correct_responses_str = 'Other correct responses: ' + ', '.join(remaining_synonyms)
-                f_default_answer_str = textwrap.fill(default_answer_str, width=80)
-                f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
-
-                print(f_default_answer_str)
-
-                if remaining_synonyms:
-                    print(f_other_correct_responses_str)
-                else:
-                    print()
+                self.remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
+                self.correctness_str = 'Correct. Default answer: ' + self.response
             else:
-                print('Correct.')
-                other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-                f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+                self.correctness_str = 'Correct.'
+                self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
 
-                if self.synonyms:
-                    print(f_other_correct_responses_str)
-                else:
-                    print()
+                # if self.synonyms:
+                #     print(f_other_correct_responses_str)
+                # else:
+                #     print()
 
         else:
             self.mtstatistics.number_incorrect += 1
             self.mtstatistics.incorrect_responses.append(self.response)
-            print('Incorrect. Answer: ' + self.response)
-
-            other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-            f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
+            self.correctness_str = 'Incorrect. Answer: ' + self.response
+            self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
             
-            if self.synonyms:
-                print(f_other_correct_responses_str)
-            else:
-                print()
+        #     if self.synonyms:
+        #         print(f_other_correct_responses_str)
+        #     else:
+        #         print()
 
-        print()
+        # print()
 
         self.mtstatistics.response_number += 1
 

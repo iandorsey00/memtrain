@@ -29,8 +29,11 @@ class MtStatistics:
     def has_synonym_been_used(self):
         return bool(self.used_synonym)
 
+    def incorrect_responses_as_string(self):
+        return ', '.join(self.incorrect_responses)
+
     def formatted_incorrect_responses(self):
-        incorrect_responses_str = ', '.join(self.incorrect_responses)
+        incorrect_responses_str = self.incorrect_responses_as_string()
         f_incorrect_responses = textwrap.fill(incorrect_responses_str,
                                               initial_indent=' ' * 6,
                                               subsequent_indent=' ' * 6,
