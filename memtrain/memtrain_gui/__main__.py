@@ -182,7 +182,7 @@ class MemtrainGUI:
         else:
             tk_messagebox.showinfo('Invalid response', 'Sorry, your response is not valid. Please try again.')
 
-        is_last_question = self.mtstatistics.response_number == self.mtstatistics.total
+        is_last_question = self.mtstatistics.response_number > self.mtstatistics.total
 
         if not is_last_question:
             self.response_clear()
