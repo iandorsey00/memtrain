@@ -189,7 +189,7 @@ class MemtrainGUI:
             self.render_question()
         else:
             msg_box_str  = 'Correct: ' + str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.total) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)\n'
-            msg_box_str += 'Average response time: ' + str(timedelta(seconds=mean(self.mtstatistics.times)) + ' seconds')
+            msg_box_str += 'Average response time: ' + str(timedelta(seconds=mean(self.mtstatistics.times))) + ' seconds')
             
             if(self.mtstatistics.number_incorrect > 0):
                 msg_box_str += '\n'
