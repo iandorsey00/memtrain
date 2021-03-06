@@ -25,7 +25,7 @@ class CSVError(Exception):
     pass
 
 class Engine:
-    def __init__(self, csvfile, level, nquestions, tags, not_tags):
+    def __init__(self, csvfile, level='', nquestions='', tags='', not_tags=''):
         # Initalize parameters
         self.csvfile = csvfile
         self.level = level

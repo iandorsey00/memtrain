@@ -1,8 +1,10 @@
 import tkinter as tk
 import tkinter.messagebox as tk_messagebox
+import tkinter.filedialog as tk_filedialog
 
 import time
 
+from functools import partial
 from datetime import timedelta
 from statistics import mean
 
@@ -11,11 +13,77 @@ from memtrain.memtrain_common.question import Question
 
 class MemtrainGUI:
     def __init__(self):
-        '''Construct the GUI interface'''
+        '''Construct the settings interface'''
         self.root = tk.Tk()
+        self.root.minsize(300, 100)
         self.root.title('memtrain v0.3a')
 
-        self.engine = Engine('C:/Users/iando/Desktop/animals.csv', '3', '', '', '')
+        self.filename = ''
+        self.level = ''
+        self.nquestions = ''
+        self.tags = ''
+        self.not_tags = ''
+
+        self.start_time = None
+        self.end_time = None
+
+        # Step 1 ##############################################################
+        self.step_1 = tk.Frame(master=self.root)
+
+        self.step_1_label_frame = tk.Frame(master=self.step_1)
+        self.step_1_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
+        self.step_1_label = tk.Label(master=self.step_1_label_frame, anchor='w',
+                                    text='Step 1. Select file')
+        self.step_1_label.pack(fill=tk.X, expand=tk.YES)
+
+        self.step_1_button_frame = tk.Frame(master=self.step_1)
+        self.select_csv_button = tk.Button(master=self.step_1_button_frame, text='Select CSV file', padx=10, command=self.select_csv)
+        self.select_csv_button.pack()
+        self.step_1_button_frame.pack(fill=tk.X, expand=tk.YES)
+
+        self.step_1_filename_frame = tk.Frame(master=self.step_1)
+        self.step_1_filename_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
+        self.step_1_filename_label = tk.Label(master=self.step_1_filename_frame, anchor='w')
+        self.step_1_filename_label.pack(fill=tk.X, expand=tk.YES)
+
+        self.step_1.pack(fill=tk.X, expand=tk.YES)
+
+        self.select_csv_button.focus_set()
+
+        # Step 2 ##############################################################
+        self.step_2 = tk.Frame(master=self.root)
+
+        self.step_2_label_frame = tk.Frame(master=self.step_2)
+        self.step_2_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
+        self.step_2_label = tk.Label(master=self.step_2_label_frame, anchor='w',
+                                    text='Step 2. Select level and start')
+        self.step_2_label.pack(fill=tk.X, expand=tk.YES)
+
+        start_level_1 = partial(self.start_level, '1')
+        start_level_2 = partial(self.start_level, '2')
+        start_level_3 = partial(self.start_level, '3')
+
+        self.step_2_button_frame = tk.Frame(master=self.step_2)
+        self.level_1_button = tk.Button(master=self.step_2_button_frame, text='Level 1', padx=10, command=start_level_1)
+        self.level_1_button.pack(side=tk.LEFT)
+        self.level_2_button = tk.Button(master=self.step_2_button_frame, text='Level 2', padx=10, command=start_level_2)
+        self.level_2_button.pack(side=tk.LEFT)
+        self.level_3_button = tk.Button(master=self.step_2_button_frame, text='Level 3', padx=10, command=start_level_3)
+        self.level_3_button.pack(side=tk.LEFT)
+        self.step_2_button_frame.pack(expand=tk.YES)
+
+        self.step_2.pack(fill=tk.X, expand=tk.YES)
+
+    def select_csv(self):
+        self.filename = tk_filedialog.askopenfilename(title='Select a memtrain CSV file',
+                filetypes=(('CSV files', '*.csv'),))
+        self.step_1_filename_label.configure(text='Selected file: ' + self.filename)
+
+    def start_level(self, level):
+        '''Start a level'''
+        self.level = level
+        # Initialize Engine
+        self.engine = Engine(self.filename, self.level, self.nquestions, self.tags, self.not_tags)
 
         self.settings = self.engine.settings
         self.database = self.engine.database
@@ -24,69 +92,79 @@ class MemtrainGUI:
 
         self.question = Question(self.settings, self.database)
 
-        self.start_time = None
-        self.end_time = None
+        # Create the training window
+        self.training_window = tk.Toplevel(self.root)
+        self.training_window.attributes('-topmost', 'true')
 
         # Upper area ##########################################################
-        self.upper = tk.Frame(master=self.root)
-        self.upper.columnconfigure(0, weight=1)
-        self.upper.columnconfigure(1, weight=1)
+        self.upper_frame = tk.Frame(master=self.training_window)
+        self.upper_frame.columnconfigure(0, weight=1)
+        self.upper_frame.columnconfigure(1, weight=1)
 
-        self.title = tk.Frame(master=self.upper)
-        self.title.grid(row=0, column=0, sticky='nsew')
-        self.title_label = tk.Label(master=self.title, anchor='w')
-        self.title_label.pack(fill=tk.BOTH, expand=tk.YES)
+        self.title_frame = tk.Frame(master=self.upper_frame)
+        self.title_frame.grid(row=0, column=0, sticky='nsew')
+        self.title_label = tk.Label(master=self.title_frame, anchor='w')
+        self.title_label.pack(fill=tk.X, expand=tk.YES)
 
-        self.level = tk.Frame(master=self.upper)
-        self.level.grid(row=0, column=1, sticky='nsew')
-        self.level_label = tk.Label(master=self.level, anchor='e')
+        self.level_frame = tk.Frame(master=self.upper_frame)
+        self.level_frame.grid(row=0, column=1, sticky='nsew')
+        self.level_label = tk.Label(master=self.level_frame, anchor='e')
         self.level_label.pack(fill=tk.X)
 
-        self.response_number = tk.Frame(master=self.upper)
-        self.response_number.grid(row=1, column=0, sticky='nsew')
-        self.response_number_label = tk.Label(master=self.response_number, anchor='w')
+        self.response_number_frame = tk.Frame(master=self.upper_frame)
+        self.response_number_frame.grid(row=1, column=0, sticky='nsew')
+        self.response_number_label = tk.Label(master=self.response_number_frame, anchor='w')
         self.response_number_label.pack(fill=tk.X)
 
-        self.correct_number = tk.Frame(master=self.upper)
-        self.correct_number.grid(row=1, column=1, sticky='nsew')
-        self.correct_number_label = tk.Label(master=self.correct_number, anchor='e')
+        self.correct_number_frame = tk.Frame(master=self.upper_frame)
+        self.correct_number_frame.grid(row=1, column=1, sticky='nsew')
+        self.correct_number_label = tk.Label(master=self.correct_number_frame, anchor='e')
         self.correct_number_label.pack(fill=tk.X)
 
-        self.upper.pack(fill=tk.X, expand=tk.YES)
+        self.upper_frame.pack(fill=tk.X)
 
         # Middle area #########################################################
-        self.middle = tk.Frame(master=self.root)
+        self.middle_frame = tk.Frame(master=self.training_window)
 
-        self.cue_text_widget = tk.Text(master=self.middle, width=75, height=8, font=('Arial', 10),
+        self.cue_text_widget = tk.Text(master=self.middle_frame, width=75, height=8, font=('Arial', 10),
                                        borderwidth=15, relief=tk.FLAT)
         self.cue_text_widget.insert(tk.END, 'This is the text of the question.')
-        self.cue_text_widget.pack()
+        self.cue_text_widget.pack(fill=tk.BOTH, expand=tk.YES)
 
-        self.middle.pack()
+        # For level 2, display a hint.
+        if self.level == '2':
+            self.hint_frame = tk.Frame(master=self.middle_frame)
+            self.hint_label = tk.Label(master=self.hint_frame, text='Hint(s):', anchor='w')
+            self.hint_label.pack(side=tk.LEFT)
+            self.hint_text_label = tk.Label(master=self.hint_frame, anchor='w', padx=10)
+            self.hint_text_label.pack(side=tk.LEFT, fill=tk.X, expand=tk.YES)
+            self.hint_frame.pack(fill=tk.X, expand=tk.YES)
+
+        self.middle_frame.pack()
 
         # Bottom area #########################################################
-        self.bottom = tk.Frame(master=self.root)
-        self.bottom.columnconfigure(0, weight=1)
-        self.bottom.rowconfigure(0, weight=2)
-        self.bottom.rowconfigure(1, weight=2)
+        self.bottom_frame = tk.Frame(master=self.training_window)
+        self.bottom_frame.columnconfigure(0, weight=1)
+        self.bottom_frame.rowconfigure(0, weight=2)
+        self.bottom_frame.rowconfigure(1, weight=2)
 
-        self.correctness = tk.Frame(master=self.bottom)
-        self.correctness.grid(row=0, column=0, sticky='nsew')
-        self.correctness_label = tk.Label(master=self.correctness, anchor='w')
+        self.correctness_frame = tk.Frame(master=self.bottom_frame)
+        self.correctness_frame.grid(row=0, column=0, sticky='nsew')
+        self.correctness_label = tk.Label(master=self.correctness_frame, anchor='w')
         self.correctness_label.pack(fill=tk.BOTH, expand=tk.YES)
         self.correctness_label.configure(text='After your first response, correctness information will appear here.')
 
-        self.other_answers = tk.Frame(master=self.bottom)
-        self.other_answers.grid(row=1, column=0, sticky='nsew')
-        self.other_answers_label = tk.Label(master=self.other_answers, anchor='w')
+        self.other_answers_frame = tk.Frame(master=self.bottom_frame)
+        self.other_answers_frame.grid(row=1, column=0, sticky='nsew')
+        self.other_answers_label = tk.Label(master=self.other_answers_frame, anchor='w')
         self.other_answers_label.pack(fill=tk.BOTH, expand=tk.YES)
 
-        self.response = tk.Frame(master=self.bottom)
-        self.response.columnconfigure(0, weight=1)
+        self.response_frame = tk.Frame(master=self.bottom_frame)
+        self.response_frame.columnconfigure(0, weight=1)
 
         self.response_entry_placeholder = False
 
-        self.response_entry = tk.Entry(master=self.response, font='Arial 9 italic')
+        self.response_entry = tk.Entry(master=self.response_frame, font='Arial 9 italic')
         self.response_entry.insert(0, 'Enter response')
         self.response_entry_placeholder = True
         self.response_entry.grid(row=2, column=0, sticky='nsew')
@@ -95,15 +173,16 @@ class MemtrainGUI:
         self.response_entry.bind('<FocusIn>', self.response_focus)
         self.response_entry.icursor(0)
 
-        self.button = tk.Button(master=self.response, text='Go', bg='green', fg='white', padx=10, command=self.submit)
+        self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
         self.button.grid(row=2, column=1)
-        self.root.bind('<Return>', self.submit)
+        self.training_window.bind('<Return>', self.submit)
 
-        self.response.grid(row=2, column=0, sticky='nsew')
+        self.response_frame.grid(row=2, column=0, sticky='nsew')
 
-        self.bottom.pack(fill=tk.X)
+        self.bottom_frame.pack(fill=tk.X)
 
         self.response_entry.focus_set()
+        self.render_question()
 
     def response_key(self, event=None):
         '''Triggered by <Key>, before sending the event to the widget'''
@@ -149,6 +228,11 @@ class MemtrainGUI:
         self.response_number_label.configure(text=self.question.response_number_text)
         self.correct_number_label.configure(text=self.question.correct_so_far_text)
         self.set_cue_text_widget_content(self.question.cue_text)
+
+        # For level 2, display hints
+        if self.level == '2':
+            these_hints = '; '.join(self.question.hints)
+            self.hint_text_label.configure(text=these_hints)
 
         self.start_time = time.time()
         # self.other_answers_label.configure(text='hhh')
@@ -197,10 +281,10 @@ class MemtrainGUI:
                 msg_box_str += self.mtstatistics.incorrect_responses_as_string()
             
             tk_messagebox.showinfo('Training session complete', msg_box_str)
+            self.training_window.destroy()
 
     def tk_mainloop(self):
         self.root.mainloop()
 
 mtgui = MemtrainGUI()
-mtgui.render_question()
 mtgui.tk_mainloop()

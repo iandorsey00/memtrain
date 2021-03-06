@@ -42,6 +42,7 @@ class Question:
         self.level_text = ''
         self.response_number_text = ''
         self.cue_text = ''
+        self.hint_text = ''
         self.correctness_str = ''
         self.other_answers_str = ''
 
