@@ -103,7 +103,6 @@ class MemtrainGUI:
     def configure_settings(self):
         self.settings_window = tk.Toplevel(self.root)
         self.settings_window.title('Settings')
-        self.settings_window.lift()
 
         ### nquestions - Number of questions
         self.nquestions_label = tk.Label(master=self.settings_window, text='Number of questions (an integer greater than zero)', anchor='w')
@@ -149,6 +148,8 @@ class MemtrainGUI:
             self.tags_entry.insert(0, self.tags)
         if self.not_tags != '':
             self.not_tags_entry.insert(0, self.not_tags)
+
+        self.nquestions_entry.focus_set()
 
     def clear_settings(self):
         '''Clear all settings Entries'''
@@ -240,7 +241,6 @@ class MemtrainGUI:
 
         # Create the training window
         self.training_window = tk.Toplevel(self.root)
-        self.training_window.lift()
 
         # Upper area ##########################################################
         self.upper_frame = tk.Frame(master=self.training_window)
@@ -447,6 +447,8 @@ class MemtrainGUI:
 
             self.render_question()
         else:
+            self.training_window.destroy()
+
             msg_box_str  = 'Correct: ' + str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.total) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)\n'
             msg_box_str += 'Average response time: ' + str(timedelta(seconds=mean(self.mtstatistics.times))) + ' seconds'
             
@@ -456,7 +458,6 @@ class MemtrainGUI:
                 msg_box_str += self.mtstatistics.incorrect_responses_as_string()
             
             tk_messagebox.showinfo('Training session complete', msg_box_str)
-            self.training_window.destroy()
             
             if self.settings.level == '1':
                     self.level_1_button.focus_set()
