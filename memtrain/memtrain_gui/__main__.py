@@ -102,8 +102,8 @@ class MemtrainGUI:
 
     def configure_settings(self):
         self.settings_window = tk.Toplevel(self.root)
-        self.settings_window.attributes('-topmost', 'true')
         self.settings_window.title('Settings')
+        self.settings_window.lift()
 
         ### nquestions - Number of questions
         self.nquestions_label = tk.Label(master=self.settings_window, text='Number of questions (an integer greater than zero)', anchor='w')
@@ -240,7 +240,7 @@ class MemtrainGUI:
 
         # Create the training window
         self.training_window = tk.Toplevel(self.root)
-        self.training_window.attributes('-topmost', 'true')
+        self.training_window.lift()
 
         # Upper area ##########################################################
         self.upper_frame = tk.Frame(master=self.training_window)
@@ -322,6 +322,7 @@ class MemtrainGUI:
             self.response_entry.bind('<KeyRelease>', self.response_keyrelease)
             self.response_entry.bind('<FocusIn>', self.response_focus)
             self.response_entry.icursor(0)
+            self.response_entry.bind('<FocusIn>', self.response_focus)
 
             self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
             self.button.grid(row=2, column=1)
@@ -342,6 +343,10 @@ class MemtrainGUI:
             self.response_entry.delete(0, tk.END)
             self.response_entry.configure(font='Arial 9')
             self.response_entry_placeholder = False
+
+    def response_focus(self, event=None):
+        '''Just set the position of the cursor to zero.'''
+        self.response_entry.icursor(0)
 
     def response_keyrelease(self, event=None):
         '''Triggered by <KeyRelease>, before sending the event to the widget'''
