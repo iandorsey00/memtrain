@@ -50,7 +50,7 @@ class Engine:
 
         self.database.populate(indices, data_list)
 
-        # Now, parse command line settings. #######################################
+        # Now, parse command line settings. ###################################
 
         # See if we've set a valid level.
         if self.level:
@@ -65,8 +65,16 @@ class Engine:
                     raise SettingError('Level 3 functionality has been disabled for this CSV.')
             else:
                 raise SettingError('Invalid level specified.')
+        # If not, choose the first enabled level.
+        else:
+            if self.settings.settings['level1'] == True:
+                self.level = '1'
+            elif self.settings.settings['level2'] == True:
+                self.level = '2'
+            elif self.settings.settings['level3'] == True:
+                self.level = '3'
 
-        # Set the level.
+        # Set the level in settings.
         self.settings.level = self.level
 
         # Get nquestions if specified on the command line.
@@ -79,10 +87,7 @@ class Engine:
             except ValueError:
                 raise SettingError('Supplied nquestions is not an int.')
 
-        # Get responses
-        # responses = database.get_all_responses()
-
-        # Main training program ###################################################
+        # Main training program ###############################################
         self.cr_id_pairs = self.database.get_all_cue_response_id_pairs()
 
         # Get response IDs for multiple tags
@@ -140,9 +145,6 @@ class Engine:
         # Raise NoResponsesError if there are no responses available.
         if self.mtstatistics.total == 0:
             raise NoResponsesError('There are no responses available that match the criteria.')
-
-        # return (settings, database, mtstatistics, cr_id_pairs)
-
 
     def normalize_row(self, row):
         '''Make every string in a row lowercase and remove all whitespace'''

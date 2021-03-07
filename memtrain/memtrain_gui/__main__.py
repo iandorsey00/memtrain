@@ -434,9 +434,7 @@ class MemtrainGUI:
         else:
             tk_messagebox.showinfo('Invalid response', 'Sorry, your response is not valid. Please try again.')
 
-        is_last_question = self.mtstatistics.response_number > self.mtstatistics.total
-
-        if not is_last_question:
+        if not self.mtstatistics.is_last_question():
             if self.level == '1':
                 for letter, mchoice_button in self.mchoice_buttons.items():
                     mchoice_button.destroy()

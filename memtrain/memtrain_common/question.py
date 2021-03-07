@@ -155,9 +155,6 @@ class Question:
         else:
             self.f_cue = self.f_cue.replace('{{3}}', '_' * 9)
 
-        # return textwrap.fill(self.f_cue, initial_indent=' ' * 6,
-        #                           subsequent_indent=' ' * 6, width=80)
-
         return self.f_cue
 
     def main_data_loop(self, cue_id, response_id, mtstatistics, final=False):
@@ -338,13 +335,6 @@ class Question:
             self.mtstatistics.incorrect_responses.append(self.response)
             self.correctness_str = 'Incorrect. Answer: ' + self.response
             self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-            
-        #     if self.synonyms:
-        #         print(f_other_correct_responses_str)
-        #     else:
-        #         print()
-
-        # print()
 
         self.mtstatistics.response_number += 1
 

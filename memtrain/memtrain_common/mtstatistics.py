@@ -32,6 +32,9 @@ class MtStatistics:
     def incorrect_responses_as_string(self):
         return ', '.join(self.incorrect_responses)
 
+    def is_last_question(self):
+        return self.response_number > self.total
+
     def formatted_incorrect_responses(self):
         incorrect_responses_str = self.incorrect_responses_as_string()
         f_incorrect_responses = textwrap.fill(incorrect_responses_str,
