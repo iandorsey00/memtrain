@@ -1,0 +1,10 @@
+﻿Animals,,,
+Cue,Response,Hint,Tag
+{{}} make milk.,Cows,Mooo,Ungulates
+You can ride on a {{}}.,horse,Neigh,Ungulates
+{{}} can fly.,Birds,Tweet,plural
+A {{}} is green and lives close to the water.,frog,Ribbet,Amphibians
+{{}} swim in the ocean.,Fish,They swim,Fishes
+A {{}} also swims in the ocean and can be dangerous.,shark,Dorsal fin,Fishes
+"{{}} are smaller than lions, not dangerous, and domesticated.",Cats,Meow,Felidae
+This land animal can be dangerous. It is a large carnivore often seen in zoos.,Lion,Roar,Felidae
