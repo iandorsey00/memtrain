@@ -94,53 +94,6 @@ class MemtrainCLI():
             print(self.mtstatistics.formatted_incorrect_responses())
             print()
 
-        # def finalize(self):
-        #     '''Notify the user of correctness, update statistics, and print'''
-        #     if self.mtstatistics.is_input_correct:
-        #         self.mtstatistics.number_correct += 1
-        #         if self.mtstatistics.has_synonym_been_used():
-        #             remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
-        #             default_answer_str = 'Correct. Default answer: ' + self.response
-        #             other_correct_responses_str = 'Other correct responses: ' + ', '.join(remaining_synonyms)
-        #             f_default_answer_str = textwrap.fill(default_answer_str, width=80)
-        #             f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
-
-        #             print(f_default_answer_str)
-
-        #             if remaining_synonyms:
-        #                 print(f_other_correct_responses_str)
-        #             else:
-        #                 print()
-        #         else:
-        #             print('Correct.')
-        #             other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-        #             f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
-
-        #             if self.synonyms:
-        #                 print(f_other_correct_responses_str)
-        #             else:
-        #                 print()
-
-        #     else:
-        #         self.mtstatistics.number_incorrect += 1
-        #         self.mtstatistics.incorrect_responses.append(self.response)
-        #         print('Incorrect. Answer: ' + self.response)
-
-        #         other_correct_responses_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-        #         f_other_correct_responses_str = textwrap.fill(other_correct_responses_str, width=80)
-                
-        #         if self.synonyms:
-        #             print(f_other_correct_responses_str)
-        #         else:
-        #             print()
-
-        #     print()
-
-        #     self.mtstatistics.response_number += 1
-
-        #     # Reset
-        #     self.mtstatistics.used_synonym = ''
-
     def header_text(self):
         # Print the first row - version and level
         print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.question.level_text.rjust(10))
@@ -194,10 +147,10 @@ class MemtrainCLI():
         print(self.f_cue)
         print()
 
-        if self.settings.settings['level1']:
+        if self.settings.level == '1':
             self.print_mchoices()
             print()
-        elif self.settings.settings['level2']:
+        elif self.settings.level == '2':
             self.print_hints()
             print()
 
