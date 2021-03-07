@@ -320,9 +320,8 @@ class MemtrainGUI:
             self.response_entry.grid(row=2, column=0, sticky='nsew')
             self.response_entry.bind('<Key>', self.response_key)
             self.response_entry.bind('<KeyRelease>', self.response_keyrelease)
-            self.response_entry.bind('<FocusIn>', self.response_focus)
+            self.response_entry.bind('<FocusIn>', self.response_focusin)
             self.response_entry.icursor(0)
-            self.response_entry.bind('<FocusIn>', self.response_focus)
 
             self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
             self.button.grid(row=2, column=1)
@@ -344,10 +343,6 @@ class MemtrainGUI:
             self.response_entry.configure(font='Arial 9')
             self.response_entry_placeholder = False
 
-    def response_focus(self, event=None):
-        '''Just set the position of the cursor to zero.'''
-        self.response_entry.icursor(0)
-
     def response_keyrelease(self, event=None):
         '''Triggered by <KeyRelease>, before sending the event to the widget'''
         # If widget is empty, italicize font, then insert placeholder
@@ -357,7 +352,7 @@ class MemtrainGUI:
             self.response_entry_placeholder = True
             self.response_entry.icursor(0)
 
-    def response_focus(self, event=None):
+    def response_focusin(self, event=None):
         '''Triggered by placing focus on the widget'''
         if(self.response_entry_placeholder == True):
             self.response_entry.icursor(0)
