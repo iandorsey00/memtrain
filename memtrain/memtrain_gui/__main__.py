@@ -28,26 +28,45 @@ class MemtrainGUI:
         self.start_time = None
         self.end_time = None
 
-        # Step 1 ##############################################################
-        self.step_1 = tk.Frame(master=self.root)
+        # Settings ############################################################
+        self.settings_frame = tk.Frame(master=self.root)
 
-        self.step_1_label_frame = tk.Frame(master=self.step_1)
+        self.settings_label_frame = tk.Frame(master=self.settings_frame)
+        self.settings_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
+        self.settings_label = tk.Label(master=self.settings_label_frame, anchor='w',
+                                       text='(Optional) Configure settings')
+        self.settings_label.pack(fill=tk.X, expand=tk.YES)
+
+        self.settings_button_frame = tk.Frame(master=self.settings_frame)
+        self.settings_button = tk.Button(master=self.settings_frame, text='Settings...', padx=10, command=self.configure_settings)
+        self.settings_button.pack()
+        self.settings_button_frame.pack(fill=tk.X, expand=tk.YES)
+
+        self.settings_frame.pack(fill=tk.X, expand=tk.YES)
+
+        self.settings_seperator = tk_ttk.Separator(master=self.root, orient='horizontal')
+        self.settings_seperator.pack(fill=tk.X, expand=tk.YES, pady=(10, 0))
+
+        # Step 1 ##############################################################
+        self.step_1_frame = tk.Frame(master=self.root)
+
+        self.step_1_label_frame = tk.Frame(master=self.step_1_frame)
         self.step_1_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
         self.step_1_label = tk.Label(master=self.step_1_label_frame, anchor='w',
-                                    text='Step 1. Select file')
+                                     text='Step 1. Select file')
         self.step_1_label.pack(fill=tk.X, expand=tk.YES)
 
-        self.step_1_button_frame = tk.Frame(master=self.step_1)
+        self.step_1_button_frame = tk.Frame(master=self.step_1_frame)
         self.select_csv_button = tk.Button(master=self.step_1_button_frame, text='Select CSV file', padx=10, command=self.select_csv)
         self.select_csv_button.pack()
         self.step_1_button_frame.pack(fill=tk.X, expand=tk.YES)
 
-        self.step_1_filename_frame = tk.Frame(master=self.step_1)
+        self.step_1_filename_frame = tk.Frame(master=self.step_1_frame)
         self.step_1_filename_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
         self.step_1_filename_label = tk.Label(master=self.step_1_filename_frame, text='No file selected.', anchor='w')
         self.step_1_filename_label.pack(fill=tk.X, expand=tk.YES)
 
-        self.step_1.pack(fill=tk.X, expand=tk.YES)
+        self.step_1_frame.pack(fill=tk.X, expand=tk.YES)
 
         self.select_csv_button.focus_set()
 
@@ -55,9 +74,9 @@ class MemtrainGUI:
         self.step_1_seperator.pack(fill=tk.X, expand=tk.YES)
 
         # Step 2 ##############################################################
-        self.step_2 = tk.Frame(master=self.root)
+        self.step_2_frame = tk.Frame(master=self.root)
 
-        self.step_2_label_frame = tk.Frame(master=self.step_2)
+        self.step_2_label_frame = tk.Frame(master=self.step_2_frame)
         self.step_2_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
         self.step_2_label = tk.Label(master=self.step_2_label_frame, anchor='w',
                                     text='Step 2. Select level and start')
@@ -67,7 +86,7 @@ class MemtrainGUI:
         start_level_2 = partial(self.start_level, '2')
         start_level_3 = partial(self.start_level, '3')
 
-        self.step_2_button_frame = tk.Frame(master=self.step_2)
+        self.step_2_button_frame = tk.Frame(master=self.step_2_frame)
         self.level_1_button = tk.Button(master=self.step_2_button_frame, text='Level 1',
                                         padx=10, state=tk.DISABLED, command=start_level_1)
         self.level_1_button.pack(side=tk.LEFT)
@@ -79,7 +98,83 @@ class MemtrainGUI:
         self.level_3_button.pack(side=tk.LEFT)
         self.step_2_button_frame.pack(expand=tk.YES)
 
-        self.step_2.pack(fill=tk.X, expand=tk.YES)
+        self.step_2_frame.pack(fill=tk.X, expand=tk.YES, pady=(0, 10))
+
+    def configure_settings(self):
+        self.settings_window = tk.Toplevel(self.root)
+        self.settings_window.attributes('-topmost', 'true')
+        self.settings_window.title('Settings')
+
+        ### nquestions - Number of questions
+        self.nquestions_label = tk.Label(master=self.settings_window, text='Number of questions (an integer greater than zero)', anchor='w')
+        self.nquestions_label.pack(fill=tk.X, expand=tk.YES)
+        
+        # nquestions validation command
+        vcmd = (self.settings_window.register(self.nquestions_validate), '%P')
+
+        self.nquestions_entry = tk.Entry(master=self.settings_window, validate='key', validatecommand=vcmd)
+        self.nquestions_entry.pack(fill=tk.X, expand=tk.YES)
+
+        ### Tags to be included
+        self.tags_label = tk.Label(master=self.settings_window, text="Include the following tags (seperated by a comma ',')", anchor='w')
+        self.tags_label.pack(fill=tk.X, expand=tk.YES)
+
+        self.tags_entry = tk.Entry(master=self.settings_window)
+        self.tags_entry.pack(fill=tk.X, expand=tk.YES)
+
+        ### Tags not to be included
+        self.not_tags_label = tk.Label(master=self.settings_window, text="Do not include the following tags (seperated by a comma ',')", anchor='w')
+        self.not_tags_label.pack(fill=tk.X, expand=tk.YES)
+
+        self.not_tags_entry = tk.Entry(master=self.settings_window)
+        self.not_tags_entry.pack(fill=tk.X, expand=tk.YES)
+
+        ### Buttons
+        self.settings_buttons_frame = tk.Frame(master=self.settings_window)
+
+        self.clear_settings_button = tk.Button(master=self.settings_buttons_frame, text='Clear settings',
+                                               command=self.clear_settings)
+        self.clear_settings_button.pack(side=tk.LEFT)
+
+        self.ok_button = tk.Button(master=self.settings_buttons_frame, text='OK',
+                                               command=self.commit_settings)
+        self.ok_button.pack(side=tk.LEFT)
+
+        self.settings_buttons_frame.pack()
+
+        # If we have values set already, fill them in.
+        if self.nquestions != '':
+            self.nquestions_entry.insert(0, self.nquestions)
+        if self.tags != '':
+            self.tags_entry.insert(0, self.tags)
+        if self.not_tags != '':
+            self.not_tags_entry.insert(0, self.not_tags)
+
+    def clear_settings(self):
+        '''Clear all settings Entries'''
+        self.nquestions_entry.delete(0, tk.END)
+        self.tags_entry.delete(0, tk.END)
+        self.not_tags_entry.delete(0, tk.END)
+
+    def commit_settings(self):
+        '''Write settings'''
+        self.nquestions = self.nquestions_entry.get()
+        self.tags = self.tags_entry.get()
+        self.not_tags = self.not_tags_entry.get()
+        self.settings_window.destroy()
+
+    def nquestions_validate(self, input):
+        if input == '':
+            return True
+        else:
+            try:
+                int(input)
+                if int(input) > 0:
+                    return True
+                else:
+                    return False
+            except ValueError:
+                return False
 
     def select_csv(self):
         self.filename = tk_filedialog.askopenfilename(title='Select a memtrain CSV file',
