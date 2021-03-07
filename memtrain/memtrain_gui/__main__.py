@@ -457,6 +457,13 @@ class MemtrainGUI:
             
             tk_messagebox.showinfo('Training session complete', msg_box_str)
             self.training_window.destroy()
+            
+            if self.settings.level == '1':
+                    self.level_1_button.focus_set()
+            elif self.settings.level == '2':
+                    self.level_2_button.focus_set()
+            elif self.settings.level == '3':
+                    self.level_3_button.focus_set()
 
     def tk_mainloop(self):
         self.root.mainloop()

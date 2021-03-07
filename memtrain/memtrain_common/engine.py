@@ -71,10 +71,13 @@ class Engine:
 
         # Get nquestions if specified on the command line.
         if self.nquestions:
-            if self.nquestions < 0:
-                raise SettingError('Invalid number of questions specified.')
-            else:
-                self.settings.settings['nquestions'] = self.nquestions
+            try:
+                if int(self.nquestions) < 0:
+                    raise SettingError('Invalid number of questions specified.')
+                else:
+                    self.settings.settings['nquestions'] = int(self.nquestions)
+            except ValueError:
+                raise SettingError('Supplied nquestions is not an int.')
 
         # Get responses
         # responses = database.get_all_responses()
@@ -93,12 +96,12 @@ class Engine:
         # Filter out other tags if tags were specified on the command line.
         if self.tags:
             these_response_ids = get_all_response_ids_for_tags(self.tags)
-            cr_id_pairs = [i for i in cr_id_pairs if i[1] in these_response_ids]
+            self.cr_id_pairs = [i for i in self.cr_id_pairs if i[1] in these_response_ids]
 
         # Remove tags if not-tags were specified on the command line.
         if self.not_tags:
             these_response_ids = get_all_response_ids_for_tags(self.not_tags)
-            cr_id_pairs = [i for i in cr_id_pairs if i[1] not in these_response_ids]
+            self.cr_id_pairs = [i for i in self.cr_id_pairs if i[1] not in these_response_ids]
 
         self.mtstatistics = MtStatistics()
         self.mtstatistics.total = len(self.cr_id_pairs)
@@ -111,23 +114,23 @@ class Engine:
             # duplicate them at random until nquestions is reached.
             if nquestions > self.mtstatistics.total:
                 add = nquestions - self.mtstatistics.total
-                new_cr_id_pairs = list(cr_id_pairs)
+                new_cr_id_pairs = list(self.cr_id_pairs)
 
                 for i in range(add):
-                    new_cr_id_pairs.append(random.choice(cr_id_pairs))
+                    new_cr_id_pairs.append(random.choice(self.cr_id_pairs))
                 
-                cr_id_pairs = list(new_cr_id_pairs)
-                self.mtstatistics.total = len(cr_id_pairs)
+                self.cr_id_pairs = list(new_cr_id_pairs)
+                self.mtstatistics.total = len(self.cr_id_pairs)
             # If nquestions is less than the total number of questions, choose the
             # questions at random until we have another.
             elif nquestions < self.mtstatistics.total:
-                random.shuffle(cr_id_pairs)
+                random.shuffle(self.cr_id_pairs)
                 new_cr_id_pairs= []
                 for i in range(nquestions):
-                    new_cr_id_pairs.append(cr_id_pairs[i])
+                    new_cr_id_pairs.append(self.cr_id_pairs[i])
                 
                 self.cr_id_pairs = list(new_cr_id_pairs)
-                self.mtstatistics.total = len(cr_id_pairs)
+                self.mtstatistics.total = len(self.cr_id_pairs)
             # If nquestions is equal to the total number of questions, don't do
             # anything.
 
