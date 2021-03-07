@@ -22,7 +22,7 @@ class CSVError(Exception):
 
 class Engine:
     def __init__(self, csvfile, level, nquestions, tags, not_tags):
-        # Initalize parameters
+        # Initalize core objects
         self.csvfile = csvfile
         self.level = level
         self.nquestions = nquestions
@@ -43,6 +43,7 @@ class Engine:
         indices['tag'] = []
         indices['mtag'] = []
 
+        # Parse the CSV
         self.set_csv_settings(self.settings, csv_list)
         self.get_csv_column_indices(indices, csv_list)
         self.csv_column_header_row_number = self.get_csv_column_header_row_number(csv_list)
@@ -77,7 +78,7 @@ class Engine:
         # Set the level in settings.
         self.settings.level = self.level
 
-        # Get nquestions if specified on the command line.
+        # Get nquestions if specified.
         if self.nquestions:
             try:
                 if int(self.nquestions) < 0:
@@ -108,6 +109,7 @@ class Engine:
             these_response_ids = get_all_response_ids_for_tags(self.not_tags)
             self.cr_id_pairs = [i for i in self.cr_id_pairs if i[1] not in these_response_ids]
 
+        # MtStatistics
         self.mtstatistics = MtStatistics()
         self.mtstatistics.total = len(self.cr_id_pairs)
 

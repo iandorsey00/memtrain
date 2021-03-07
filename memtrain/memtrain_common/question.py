@@ -14,6 +14,7 @@ class NoResponsesError(Exception):
 class Question:
     '''Manages the current cue and response interface'''
     def __init__(self, settings, database):
+        # Initialize core objects
         self.settings = settings
         self.conn = database.conn
         self.cur = self.conn.cursor()
@@ -136,7 +137,8 @@ class Question:
         return out
 
     def is_plural(self, string):
-        return string[-1] == 's'
+        '''Detects most plural words in English'''
+        return string[-1:] == 's' or string[-2:] == 'es'
 
     # Question rendering ######################################################
     def format_cue(self):
@@ -158,12 +160,14 @@ class Question:
         return self.f_cue
 
     def main_data_loop(self, cue_id, response_id, mtstatistics, final=False):
-        '''Get header text'''
+        '''Main data processing for question rendering'''
 
+        # Initialize core objects
         self.cue_id = cue_id
         self.response_id = response_id
         self.mtstatistics = mtstatistics
 
+        # Other important data
         self.cue = self.get_cue(self.cue_id)
         self.response = self.get_response(self.response_id)
         self.placement = self.get_placement(self.cue_id, self.response_id)
@@ -180,6 +184,7 @@ class Question:
         elif self.settings.level == '3':
             self.level_text = 'Level 3'
 
+        # Important text
         self.title_text = self.settings.settings['title']
         self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + ' of ' + str(self.mtstatistics.total)
         self.correct_so_far_text = str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' · ' + str(round(self.mtstatistics.percentage, 1)) + '%'
@@ -253,6 +258,7 @@ class Question:
         return out
 
     def validate_input(self):
+        '''Determine if input is valid'''
         self.mtstatistics.is_input_valid = False
 
         if self.settings.level == '1':
@@ -324,12 +330,6 @@ class Question:
             else:
                 self.correctness_str = 'Correct.'
                 self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
-
-                # if self.synonyms:
-                #     print(f_other_correct_responses_str)
-                # else:
-                #     print()
-
         else:
             self.mtstatistics.number_incorrect += 1
             self.mtstatistics.incorrect_responses.append(self.response)
