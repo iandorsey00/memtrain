@@ -66,6 +66,9 @@ class Engine:
             else:
                 raise SettingError('Invalid level specified.')
 
+        # Set the level.
+        self.settings.level = self.level
+
         # Get nquestions if specified on the command line.
         if self.nquestions:
             if self.nquestions < 0:

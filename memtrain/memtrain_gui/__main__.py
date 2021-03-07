@@ -132,6 +132,16 @@ class MemtrainGUI:
     def start_level(self, level):
         '''Start a level'''
         self.level = level
+        
+        # Initialize Engine
+        self.engine = Engine(self.filename, self.level, self.nquestions, self.tags, self.not_tags)
+
+        self.settings = self.engine.settings
+        self.database = self.engine.database
+        self.mtstatistics = self.engine.mtstatistics
+        self.cr_id_pairs = self.engine.cr_id_pairs
+
+        self.question = Question(self.settings, self.database)
 
         # Create the training window
         self.training_window = tk.Toplevel(self.root)

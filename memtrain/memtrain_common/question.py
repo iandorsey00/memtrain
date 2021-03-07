@@ -176,41 +176,17 @@ class Question:
         self.mtstatistics.update_percentage()
 
         # Determine the level
-        if self.settings.settings['level1']:
+        if self.settings.level == '1':
             self.level_text = 'Level 1'
-        elif self.settings.settings['level2']:
+        elif self.settings.level == '2':
             self.level_text = 'Level 2'
-        elif self.settings.settings['level3']:
+        elif self.settings.level == '3':
             self.level_text = 'Level 3'
 
         self.title_text = self.settings.settings['title']
         self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + ' of ' + str(self.mtstatistics.total)
         self.correct_so_far_text = str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' · ' + str(round(self.mtstatistics.percentage, 1)) + '%'
         self.cue_text = self.format_cue()
-
-        # Print the first row - version and level
-        # print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.level_text.rjust(10))
-        # print()
-
-        if final:
-            # Just print the title
-            # print(self.settings.settings['title'])
-            pass
-        else:
-            # Print the second row - title and number of responses
-            # title_block = self.settings.settings['title'].ljust(59)
-            # self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
-            # responses_block = (self.response_number_text).rjust(20)
-
-            # print(title_block + self.iam + responses_block)
-
-            # Print the third row if we are not on the first response - statistics
-            # regarding the number of problems right so far.
-            # if self.mtstatistics.response_number != 1:
-                # label_block = 'Correct so far'.ljust(59)
-                # statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
-                # print(label_block + self.iam + statistics_block)
-            pass
 
     def generate_mchoices(self):
         '''Return the choices for the multiple choice questions'''
@@ -282,7 +258,7 @@ class Question:
     def validate_input(self):
         self.mtstatistics.is_input_valid = False
 
-        if self.settings.settings['level1']:
+        if self.settings.level == '1':
             if self.user_input in self.ascii_range:
                 self.mtstatistics.is_input_valid = True
         else:
@@ -332,12 +308,12 @@ class Question:
 
     def grade_input(self):
         '''Determine whether input is correct.'''
-        if self.settings.settings['level1']:
+        if self.settings.level == '1':
             # For level 1, check to see if the right letter was entered.
             # First, translate the letter to its corresponding choice.
             self.user_input = self.mchoices[self.user_input]
             self.mtstatistics.is_input_correct = self.response.lower() == self.user_input.lower()
-        elif self.settings.settings['level2'] or self.settings.settings['level3']:
+        else:
             # For levels 2 or 3, make sure the right input was entered.
             self.determine_equivalence()
     

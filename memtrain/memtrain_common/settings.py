@@ -14,12 +14,19 @@ class Settings:
 
         ### Levels
 
+        ## Whether or not levels are enabled.
+
         # Level 1 - Multiple choice questions
         self.settings['level1'] = True
         # Level 2 - Use a hint to respond
         self.settings['level2'] = True
         # Level 3 - Respond on your own
         self.settings['level3'] = True
+
+        ##
+
+        # The level currently in use.
+        self.level = ''
 
         ## Integer settings
         self.integer_labels = ['nquestions']

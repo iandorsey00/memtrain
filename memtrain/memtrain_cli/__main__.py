@@ -22,11 +22,12 @@ def train(args):
         # Don't continue with the loop until a valid response has been
         # entered.
         while not mtstatistics.is_input_valid:
-            question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
+            # question.render_question(cr_id_pair[0], cr_id_pair[1], mtstatistics)
+            pass
 
     mtstatistics.update_percentage()
 
-    question.print_header(True)
+    # question.print_header(True)
     print()
     print('Training session complete.')
     print()
@@ -184,6 +185,28 @@ def train(args):
             # while not self.mtstatistics.is_input_valid:
 
                 # input('Press Enter to continue.')
+
+            # Print the first row - version and level
+        # print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.level_text.rjust(10))
+        # print()
+
+        # if final:
+            # Just print the title
+            # print(self.settings.settings['title'])
+        # else:
+            # Print the second row - title and number of responses
+            # title_block = self.settings.settings['title'].ljust(59)
+            # self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+            # responses_block = (self.response_number_text).rjust(20)
+
+            # print(title_block + self.iam + responses_block)
+
+            # Print the third row if we are not on the first response - statistics
+            # regarding the number of problems right so far.
+            # if self.mtstatistics.response_number != 1:
+                # label_block = 'Correct so far'.ljust(59)
+                # statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
+                # print(label_block + self.iam + statistics_block)
 
 ###############################################################################
 # Argument parsing with argparse
