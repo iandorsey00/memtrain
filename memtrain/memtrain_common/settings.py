@@ -1,3 +1,7 @@
+# SettingError ################################################################
+class SettingError(Exception):
+    pass
+
 class Settings:
     '''Manage settings for memtrain'''
     def __init__(self):

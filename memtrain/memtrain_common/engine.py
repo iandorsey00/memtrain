@@ -6,15 +6,11 @@ import time
 import string
 import textwrap
 
-from memtrain.memtrain_common.settings import Settings
+from memtrain.memtrain_common.settings import Settings, SettingError
 from memtrain.memtrain_common.database import Database
 from memtrain.memtrain_common.mtstatistics import MtStatistics
 
 import os
-
-# SettingError ################################################################
-class SettingError(Exception):
-    pass
 
 # NoResponsesError ############################################################
 class NoResponsesError(Exception):
@@ -25,7 +21,7 @@ class CSVError(Exception):
     pass
 
 class Engine:
-    def __init__(self, csvfile, level='', nquestions='', tags='', not_tags=''):
+    def __init__(self, csvfile, level, nquestions, tags, not_tags):
         # Initalize parameters
         self.csvfile = csvfile
         self.level = level
@@ -56,29 +52,17 @@ class Engine:
 
         # Now, parse command line settings. #######################################
 
-        # Set level, if one was specified:
+        # See if we've set a valid level.
         if self.level:
             if self.level == '1':
                 if self.settings.settings['level1'] == False:
                     raise SettingError('Level 1 functionality has been disabled for this CSV.')
-                else:
-                    self.settings.settings['level1'] = True
-                    self.settings.settings['level2'] = False
-                    self.settings.settings['level3'] = False
             elif self.level == '2':
                 if self.settings.settings['level2'] == False:
                     raise SettingError('Level 2 functionality has been disabled for this CSV.')
-                else:
-                    self.settings.settings['level1'] = False
-                    self.settings.settings['level2'] = True
-                    self.settings.settings['level3'] = False
             elif self.level == '3':
                 if self.settings.settings['level3'] == False:
                     raise SettingError('Level 3 functionality has been disabled for this CSV.')
-                else:
-                    self.settings.settings['level1'] = False
-                    self.settings.settings['level2'] = False
-                    self.settings.settings['level3'] = True
             else:
                 raise SettingError('Invalid level specified.')
 

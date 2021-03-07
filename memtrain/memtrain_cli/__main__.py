@@ -174,6 +174,17 @@ def train(args):
     #     # Reset
     #     self.mtstatistics.used_synonym = ''
 
+    
+        # self.other_answers_label.configure(text='hhh')
+        # for cr_id_pair in self.cr_id_pairs:
+            # self.mtstatistics.is_input_valid = False
+
+            # Don't continue with the loop until a valid response has been
+            # entered.
+            # while not self.mtstatistics.is_input_valid:
+
+                # input('Press Enter to continue.')
+
 ###############################################################################
 # Argument parsing with argparse
 

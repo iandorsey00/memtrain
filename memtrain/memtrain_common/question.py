@@ -25,7 +25,7 @@ class Question:
         self.response_id = 0
         self.f_cue = ''
         self.mtags = []
-        self.mchoices = []
+        self.mchoices = dict()
 
         self.iam = ' '
         self.ascii_range = ['a', 'b', 'c', 'd']
