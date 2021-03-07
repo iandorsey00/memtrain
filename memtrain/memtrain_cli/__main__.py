@@ -11,6 +11,7 @@ from memtrain.memtrain_common.question import Question
 
 class MemtrainCLI():
     def __init__(self):
+        # Initalize core objects
         self.engine = None
 
         self.settings = None
@@ -32,6 +33,7 @@ class MemtrainCLI():
         self.mchoices = None
 
         # Inter-area margin
+        # The character that's printed between CLI interface areas
         self.iam = ' '
 
         #######################################################################
@@ -54,7 +56,8 @@ class MemtrainCLI():
         self.args.func(self.args)
 
     def train(self, args):
-        # Read arguments
+        '''Main wrapper for the CLI'''
+        # Initialize core objects
         self.csvfile = self.args.csvfile
         self.level = self.args.level
         self.nquestions = self.args.nquestions
@@ -70,6 +73,7 @@ class MemtrainCLI():
 
         self.question = Question(self.settings, self.database)
 
+        # For each cue and response ID pair:
         for cr_id_pair in self.cr_id_pairs:
             self.mtstatistics.is_input_valid = False
 
@@ -77,7 +81,6 @@ class MemtrainCLI():
             # entered.
             while not self.mtstatistics.is_input_valid:
                 self.render_question(cr_id_pair[0], cr_id_pair[1])
-                pass
 
         self.mtstatistics.update_percentage()
 
@@ -95,6 +98,7 @@ class MemtrainCLI():
             print()
 
     def header_text(self):
+        '''Printer header text'''
         # Print the first row - version and level
         print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.question.level_text.rjust(10))
         print()
@@ -141,12 +145,15 @@ class MemtrainCLI():
         self.header_text()
 
         self.f_cue = self.question.format_cue()
+        # More cue formatting for the CLI interface
         self.f_cue = textwrap.fill(self.f_cue, initial_indent=' ' * 6,
                                    subsequent_indent=' ' * 6, width=80)
         print()
         print(self.f_cue)
         print()
 
+        # For level 1, print multiple choices.
+        # For level 2, print hints.
         if self.settings.level == '1':
             self.print_mchoices()
             print()
@@ -169,6 +176,7 @@ class MemtrainCLI():
         # Clear screen.
         os.system('cls')
 
+        # If the input is valid, grade input and finalize
         if self.mtstatistics.is_input_valid:
             self.question.grade_input()
             self.mtstatistics.times.append(elasped_time)
@@ -181,6 +189,8 @@ class MemtrainCLI():
                 print(f_other_answers_str)
 
             print()
+        # Otherwise, keep looping until a valid response is entered.
+        # See line 82.
         else:
             print('Please enter a valid response.')
             print()
