@@ -46,6 +46,7 @@ class Question:
         self.hint_text = ''
         self.correctness_str = ''
         self.other_answers_str = ''
+        self.stage_text = ''
 
     def get_value(self, value, value_id):
         self.cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''
@@ -183,6 +184,11 @@ class Question:
             self.level_text = 'Level 2'
         elif self.settings.level == '3':
             self.level_text = 'Level 3'
+
+        if hasattr(self.settings, 'current_stage_label'):
+            self.stage_text = self.settings.current_stage_label
+        else:
+            self.stage_text = ''
 
         # Important text
         self.title_text = self.settings.settings['title']

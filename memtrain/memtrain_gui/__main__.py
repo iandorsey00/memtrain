@@ -17,13 +17,14 @@ class MemtrainGUI:
         '''Initialize main variables and the configuration window'''
         self.root = tk.Tk()
         self.root.minsize(300, 100)
-        self.root.title('memtrain v0.3a')
+        self.root.title('memtrain v0.4.0')
 
         self.filename = ''
         self.level = ''
         self.nquestions = ''
         self.tags = ''
         self.not_tags = ''
+        self.current_item = None
 
         self.start_time = None
         self.end_time = None
@@ -83,15 +84,19 @@ class MemtrainGUI:
         self.step_2_label_frame = tk.Frame(master=self.step_2_frame)
         self.step_2_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
         self.step_2_label = tk.Label(master=self.step_2_label_frame, anchor='w',
-                                    text='Step 2. Select level and start')
+                                    text='Step 2. Start adaptive study or choose a fixed level')
         self.step_2_label.pack(fill=tk.X, expand=tk.YES)
 
+        start_adaptive = partial(self.start_level, '')
         start_level_1 = partial(self.start_level, '1')
         start_level_2 = partial(self.start_level, '2')
         start_level_3 = partial(self.start_level, '3')
 
         # Wait until CSV is loaded to change buttons into normal state.
         self.step_2_button_frame = tk.Frame(master=self.step_2_frame)
+        self.adaptive_button = tk.Button(master=self.step_2_button_frame, text='Adaptive',
+                                        padx=10, state=tk.DISABLED, command=start_adaptive)
+        self.adaptive_button.pack(side=tk.LEFT)
         self.level_1_button = tk.Button(master=self.step_2_button_frame, text='Level 1',
                                         padx=10, state=tk.DISABLED, command=start_level_1)
         self.level_1_button.pack(side=tk.LEFT)
@@ -211,35 +216,16 @@ class MemtrainGUI:
                                self.settings.settings['level2'],
                                self.settings.settings['level3']]
 
-        # Number of levels enabled
-        only_one_enabled_level = sum(settings_truth_list) == 1
-
-        # Enable buttons. If there is only enabled level, just start it
-        # immediately.
+        # Enable buttons now that we have loaded the file.
+        self.adaptive_button.configure(state=tk.NORMAL)
         if self.settings.settings['level1'] == True:
             self.level_1_button.configure(state=tk.NORMAL)
-            if only_one_enabled_level:
-                self.level_1_button.focus_set()
-                self.start_level('1')
         if self.settings.settings['level2'] == True:
             self.level_2_button.configure(state=tk.NORMAL)
-            if only_one_enabled_level:
-                self.level_2_button.focus_set()
-                self.start_level('2')
         if self.settings.settings['level3'] == True:
             self.level_3_button.configure(state=tk.NORMAL)
-            if only_one_enabled_level:
-                self.level_3_button.focus_set()
-                self.start_level('3')
 
-        # If there are multiple levels enabled, set focus the button of the
-        # first enabled level.
-        if self.settings.settings['level1'] == True:
-                self.level_1_button.focus_set()
-        elif self.settings.settings['level2'] == True:
-                self.level_2_button.focus_set()
-        elif self.settings.settings['level3'] == True:
-                self.level_3_button.focus_set()
+        self.adaptive_button.focus_set()
 
     def start_level(self, level):
         '''Start a level'''
@@ -285,14 +271,11 @@ class MemtrainGUI:
         self.cue_text_widget.insert(tk.END, 'This is the text of the question.')
         self.cue_text_widget.pack(fill=tk.BOTH, expand=tk.YES)
 
-        # For level 2, display a hint.
-        if self.level == '2':
-            self.hint_frame = tk.Frame(master=self.middle_frame)
-            self.hint_label = tk.Label(master=self.hint_frame, text='Hint(s):', anchor='w')
-            self.hint_label.pack(side=tk.LEFT)
-            self.hint_text_label = tk.Label(master=self.hint_frame, anchor='w', padx=10)
-            self.hint_text_label.pack(side=tk.LEFT, fill=tk.X, expand=tk.YES)
-            self.hint_frame.pack(fill=tk.X, expand=tk.YES)
+        self.hint_frame = tk.Frame(master=self.middle_frame)
+        self.hint_label = tk.Label(master=self.hint_frame, text='Hint(s):', anchor='w')
+        self.hint_label.pack(side=tk.LEFT)
+        self.hint_text_label = tk.Label(master=self.hint_frame, anchor='w', padx=10)
+        self.hint_text_label.pack(side=tk.LEFT, fill=tk.X, expand=tk.YES)
 
         self.correctness_frame = tk.Frame(master=self.middle_frame)
         self.correctness_frame.pack(fill=tk.X, expand=tk.YES)
@@ -310,34 +293,32 @@ class MemtrainGUI:
         # Bottom area #########################################################
         self.bottom_frame = tk.Frame(master=self.training_window)
 
-        if self.level == '1':
-            self.mchoices_frame = tk.Frame(master=self.bottom_frame)
-            self.mchoices_frame.grid(row=0, column=0, sticky='nsew')
-            self.mchoices_frame.columnconfigure(0, weight=0)
-            self.mchoices_frame.columnconfigure(1, weight=2)
-        else:
-            self.bottom_frame.columnconfigure(0, weight=1)
-            self.response_frame = tk.Frame(master=self.bottom_frame)
-            self.response_frame.columnconfigure(0, weight=1)
+        self.bottom_frame.columnconfigure(0, weight=1)
+        self.mchoices_frame = tk.Frame(master=self.bottom_frame)
+        self.mchoices_frame.grid(row=0, column=0, sticky='nsew')
+        self.mchoices_frame.columnconfigure(0, weight=0)
+        self.mchoices_frame.columnconfigure(1, weight=2)
 
-            self.response_entry_placeholder = False
+        self.response_frame = tk.Frame(master=self.bottom_frame)
+        self.response_frame.columnconfigure(0, weight=1)
 
-            self.response_entry = tk.Entry(master=self.response_frame, font='Arial 9 italic')
-            self.response_entry.insert(0, 'Enter response')
-            self.response_entry_placeholder = True
-            self.response_entry.grid(row=2, column=0, sticky='nsew')
-            self.response_entry.bind('<Key>', self.response_key)
-            self.response_entry.bind('<KeyRelease>', self.response_keyrelease)
-            self.response_entry.bind('<FocusIn>', self.response_focusin)
-            self.response_entry.icursor(0)
+        self.response_entry_placeholder = False
 
-            self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
-            self.button.grid(row=2, column=1)
-            self.training_window.bind('<Return>', self.submit)
+        self.response_entry = tk.Entry(master=self.response_frame, font='Arial 9 italic')
+        self.response_entry.insert(0, 'Enter response')
+        self.response_entry_placeholder = True
+        self.response_entry.grid(row=2, column=0, sticky='nsew')
+        self.response_entry.bind('<Key>', self.response_key)
+        self.response_entry.bind('<KeyRelease>', self.response_keyrelease)
+        self.response_entry.bind('<FocusIn>', self.response_focusin)
+        self.response_entry.icursor(0)
 
-            self.response_frame.grid(row=2, column=0, sticky='nsew')
+        self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
+        self.button.grid(row=2, column=1)
+        self.training_window.bind('<Return>', self.submit)
 
-            self.response_entry.focus_set()
+        self.response_frame.grid(row=2, column=0, sticky='nsew')
+        self.response_frame.grid_remove()
 
         self.bottom_frame.pack(fill=tk.X)
         self.render_question()
@@ -378,6 +359,29 @@ class MemtrainGUI:
         self.cue_text_widget.delete(1.0, tk.END)
         self.cue_text_widget.insert(tk.END, content)
 
+    def clear_mchoices(self):
+        if hasattr(self, 'mchoice_buttons'):
+            for letter, mchoice_button in self.mchoice_buttons.items():
+                mchoice_button.destroy()
+        if hasattr(self, 'mchoice_labels'):
+            for letter, mchoice_label in self.mchoice_labels.items():
+                mchoice_label.destroy()
+
+    def configure_prompt_area(self):
+        if self.settings.level == '1':
+            self.response_frame.grid_remove()
+            self.mchoices_frame.grid()
+            self.hint_frame.pack_forget()
+        else:
+            self.mchoices_frame.grid_remove()
+            self.response_frame.grid()
+            self.response_entry.focus_set()
+
+            if self.settings.level == '2':
+                self.hint_frame.pack(fill=tk.X, expand=tk.YES)
+            else:
+                self.hint_frame.pack_forget()
+
     def render_question(self):
         '''Render the question and process the necessary data to do so'''
         # Data processing #####################################################
@@ -387,22 +391,31 @@ class MemtrainGUI:
         # See memtrain.memtrain_common.question
         # This method is responsible for processing the data needed to render
         # the question.
+        self.current_item = self.engine.current_item(this_question_id)
+        self.settings.level = self.current_item['level']
+        self.settings.current_stage_label = self.current_item['stage_label']
         self.question.main_data_loop(self.cr_id_pairs[this_question_id][0], self.cr_id_pairs[this_question_id][1], self.mtstatistics)
 
         # Change Labels and Text widget text
-        self.title_label.configure(text=self.question.title_text)
+        title_text = self.question.title_text
+        if self.engine.session_mode == 'adaptive':
+            title_text += ' [' + self.current_item['stage_label'] + ']'
+        self.title_label.configure(text=title_text)
         self.level_label.configure(text=self.question.level_text)
         self.response_number_label.configure(text=self.question.response_number_text)
         self.correct_number_label.configure(text=self.question.correct_so_far_text)
         self.set_cue_text_widget_content(self.question.cue_text)
+        self.configure_prompt_area()
 
         # For level 2, display hints
-        if self.level == '2':
+        if self.settings.level == '2':
             these_hints = '; '.join(self.question.hints)
             self.hint_text_label.configure(text=these_hints)
 
         # For level 1, display multiple choices
-        if self.level == '1':
+        self.clear_mchoices()
+
+        if self.settings.level == '1':
             self.question.mchoices = self.question.generate_mchoices()
 
             counter = 0
@@ -422,7 +435,6 @@ class MemtrainGUI:
                 self.mchoice_buttons[letter].grid(row=counter, column=0, sticky='nsew')
                 self.mchoice_labels[letter] = tk.Label(master=self.mchoices_frame, text=choice, padx=10, anchor='w')
                 self.mchoice_labels[letter].grid(row=counter, column=1, sticky='w')
-                self.mchoices_frame.pack(fill=tk.X, expand=tk.YES)
 
                 counter += 1
 
@@ -432,7 +444,7 @@ class MemtrainGUI:
 
     def submit(self, event=None, mchoice_letter=None):
         '''Submit response'''
-        if self.level == '1':
+        if self.settings.level == '1':
             self.question.user_input = mchoice_letter
         else:
             self.question.user_input = self.response_entry.get().lower()
@@ -448,6 +460,7 @@ class MemtrainGUI:
 
             # Grade input and do finalization work
             self.question.grade_input()
+            self.engine.record_result(self.current_item, self.mtstatistics.is_input_correct, elapsed_time)
             self.question.finalize()
             self.correctness_label.configure(text=self.question.correctness_str)
 
@@ -462,12 +475,7 @@ class MemtrainGUI:
         # Clean up after a question
         if not self.mtstatistics.is_last_question():
             # Clear response areas
-            if self.level == '1':
-                for letter, mchoice_button in self.mchoice_buttons.items():
-                    mchoice_button.destroy()
-                for letter, mchoice_label in self.mchoice_labels.items():
-                    mchoice_label.destroy()
-            else:
+            if self.settings.level != '1':
                 self.response_clear()
 
             # Get ready for the next question
@@ -489,12 +497,14 @@ class MemtrainGUI:
             
             # Set the level button focus in the configuration window to the
             # button for the level just completed
-            if self.settings.level == '1':
+            if self.level == '1':
                     self.level_1_button.focus_set()
-            elif self.settings.level == '2':
+            elif self.level == '2':
                     self.level_2_button.focus_set()
-            elif self.settings.level == '3':
+            elif self.level == '3':
                     self.level_3_button.focus_set()
+            else:
+                    self.adaptive_button.focus_set()
 
     def tk_mainloop(self):
         self.root.mainloop()

@@ -277,10 +277,22 @@ class Database:
     def get_all_response_ids(self):
         return self.query('response_id', 'responses')
 
+    def get_cue_id(self, cue):
+        self.cur.execute('''SELECT cue_id FROM cues WHERE cue = (?)''', (cue, ))
+        rows = self.cur.fetchall()
+        return rows[0][0]
+
+    def get_response_id(self, response):
+        self.cur.execute('''SELECT response_id FROM responses WHERE response = (?)''', (response, ))
+        rows = self.cur.fetchall()
+        return rows[0][0]
+
     def get_all_response_ids_by_tag(self, tag):
         self.cur.execute('''SELECT tag_id FROM tags
                          WHERE tag = (?)''', (str(tag), ))
         rows = self.cur.fetchall()
+        if len(rows) == 0:
+            return []
         tag_id = rows[0][0]
         self.cur.execute('''SELECT response_id FROM responses_to_tags
                             WHERE tag_id = (?)''', (str(tag_id), ))

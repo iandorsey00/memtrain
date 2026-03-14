@@ -5,10 +5,12 @@ import decimal
 import time
 import string
 import textwrap
+import hashlib
 
 from memtrain.memtrain_common.settings import Settings, SettingError
 from memtrain.memtrain_common.database import Database
 from memtrain.memtrain_common.mtstatistics import MtStatistics
+from memtrain.memtrain_common.progress_store import ProgressStore
 
 import os
 
@@ -28,11 +30,20 @@ class Engine:
         self.nquestions = nquestions
         self.tags = tags
         self.not_tags = not_tags
+        self.stage_labels = {
+            0: 'New',
+            1: 'Reinforcing',
+            2: 'Guided recall',
+            3: 'Free recall',
+            4: 'Mature',
+        }
 
         # Initialize settings and database
         csv_list = self.load(self.csvfile)
         self.settings = Settings()
         self.database = Database()
+        self.progress_store = ProgressStore(self.csvfile)
+        self.study_set_id = self.get_study_set_id()
 
         # Initialize indices dictionary
         indices = dict()
@@ -42,6 +53,7 @@ class Engine:
         indices['hint'] = []
         indices['tag'] = []
         indices['mtag'] = []
+        indices['item_id'] = []
 
         # Parse the CSV
         self.set_csv_settings(self.settings, csv_list)
@@ -50,33 +62,35 @@ class Engine:
         data_list = csv_list[self.csv_column_header_row_number+1:]
 
         self.database.populate(indices, data_list)
+        self.all_items = self.build_item_records(indices, data_list)
 
         # Now, parse command line settings. ###################################
+
+        self.session_mode = 'adaptive'
 
         # See if we've set a valid level.
         if self.level:
             if self.level == '1':
                 if self.settings.settings['level1'] == False:
                     raise SettingError('Level 1 functionality has been disabled for this CSV.')
+                self.session_mode = 'manual'
             elif self.level == '2':
                 if self.settings.settings['level2'] == False:
                     raise SettingError('Level 2 functionality has been disabled for this CSV.')
+                self.session_mode = 'manual'
             elif self.level == '3':
                 if self.settings.settings['level3'] == False:
                     raise SettingError('Level 3 functionality has been disabled for this CSV.')
+                self.session_mode = 'manual'
             else:
                 raise SettingError('Invalid level specified.')
-        # If not, choose the first enabled level.
-        else:
-            if self.settings.settings['level1'] == True:
-                self.level = '1'
-            elif self.settings.settings['level2'] == True:
-                self.level = '2'
-            elif self.settings.settings['level3'] == True:
-                self.level = '3'
 
-        # Set the level in settings.
-        self.settings.level = self.level
+        if self.session_mode == 'manual':
+            self.settings.level = self.level
+        else:
+            self.settings.level = '1'
+
+        self.settings.session_mode = self.session_mode
 
         # Get nquestions if specified.
         if self.nquestions:
@@ -89,64 +103,261 @@ class Engine:
                 raise SettingError('Supplied nquestions is not an int.')
 
         # Main training program ###############################################
-        self.cr_id_pairs = self.database.get_all_cue_response_id_pairs()
-
-        # Get response IDs for multiple tags
-        def get_all_response_ids_for_tags(tags):
-            these_response_ids = []
-            args_tags = tags.split(',')
-            for tag in args_tags:
-                these_response_ids += self.database.get_all_response_ids_by_tag(tag)
-            return list(set(these_response_ids))
-
-        # Filter out other tags if tags were specified on the command line.
-        if self.tags:
-            these_response_ids = get_all_response_ids_for_tags(self.tags)
-            self.cr_id_pairs = [i for i in self.cr_id_pairs if i[1] in these_response_ids]
-
-        # Remove tags if not-tags were specified on the command line.
-        if self.not_tags:
-            these_response_ids = get_all_response_ids_for_tags(self.not_tags)
-            self.cr_id_pairs = [i for i in self.cr_id_pairs if i[1] not in these_response_ids]
+        self.filtered_items = self.filter_items(list(self.all_items))
+        self.session_items = self.build_session_items(self.filtered_items)
+        self.cr_id_pairs = [(item['cue_id'], item['response_id']) for item in self.session_items]
 
         # MtStatistics
         self.mtstatistics = MtStatistics()
-        self.mtstatistics.total = len(self.cr_id_pairs)
-
-        # If nquestions is not 0, add necessary responses or remove responses.
-        nquestions = self.settings.settings['nquestions']
-
-        if nquestions != 0:
-            # If nquestions is greater than the total number of questions,
-            # duplicate them at random until nquestions is reached.
-            if nquestions > self.mtstatistics.total:
-                add = nquestions - self.mtstatistics.total
-                new_cr_id_pairs = list(self.cr_id_pairs)
-
-                for i in range(add):
-                    new_cr_id_pairs.append(random.choice(self.cr_id_pairs))
-                
-                self.cr_id_pairs = list(new_cr_id_pairs)
-                self.mtstatistics.total = len(self.cr_id_pairs)
-            # If nquestions is less than the total number of questions, choose the
-            # questions at random until we have another.
-            elif nquestions < self.mtstatistics.total:
-                random.shuffle(self.cr_id_pairs)
-                new_cr_id_pairs= []
-                for i in range(nquestions):
-                    new_cr_id_pairs.append(self.cr_id_pairs[i])
-                
-                self.cr_id_pairs = list(new_cr_id_pairs)
-                self.mtstatistics.total = len(self.cr_id_pairs)
-            # If nquestions is equal to the total number of questions, don't do
-            # anything.
-
-        # Shuffle database
-        random.shuffle(self.cr_id_pairs)
+        self.mtstatistics.total = len(self.session_items)
 
         # Raise NoResponsesError if there are no responses available.
         if self.mtstatistics.total == 0:
             raise NoResponsesError('There are no responses available that match the criteria.')
+
+    def get_study_set_id(self):
+        normalized = os.path.abspath(self.csvfile)
+        return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
+
+    def build_item_id(self, cue, response):
+        normalized = '{}::{}'.format(cue.strip(), response.strip())
+        return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
+
+    def level_for_stage(self, stage):
+        if stage <= 1:
+            return '1'
+        if stage == 2:
+            return '2'
+        return '3'
+
+    def stage_label(self, stage):
+        return self.stage_labels.get(stage, 'Unknown')
+
+    def default_progress(self):
+        return {
+            'current_stage': 0,
+            'mastery_score': 0.0,
+            'success_streak': 0,
+            'failure_count': 0,
+            'lapse_count': 0,
+            'average_response_time': 0.0,
+            'reviews': 0,
+            'last_seen_at': None,
+            'next_due_at': None,
+        }
+
+    def merge_progress(self, item, progress_map):
+        progress = dict(self.default_progress())
+        if item['item_id'] in progress_map:
+            progress.update(progress_map[item['item_id']])
+
+        item['progress'] = progress
+        item['current_stage'] = int(progress['current_stage'])
+        item['level'] = self.level_for_stage(item['current_stage'])
+        item['stage_label'] = self.stage_label(item['current_stage'])
+        item['is_new'] = progress['last_seen_at'] is None
+
+        next_due_at = self.progress_store.parse_datetime(progress['next_due_at'])
+        item['next_due_at'] = next_due_at
+        item['is_due'] = progress['last_seen_at'] is not None and (
+            next_due_at is None or next_due_at <= self.progress_store.now()
+        )
+        item['is_weak'] = progress['failure_count'] > 0 or progress['mastery_score'] < 0.4
+
+        return item
+
+    def build_item_records(self, indices, data_list):
+        out = []
+
+        for data_row in data_list:
+            cue = data_row[indices['cue'][0]]
+
+            for placement, response_index in enumerate(indices['response']):
+                response = data_row[response_index]
+
+                if not response:
+                    continue
+
+                item = {
+                    'item_id': self.build_item_id(cue, response),
+                    'cue': cue,
+                    'response': response,
+                    'cue_id': self.database.get_cue_id(cue),
+                    'response_id': self.database.get_response_id(response),
+                    'placement': placement + 1,
+                }
+                out.append(item)
+
+        return out
+
+    def get_all_response_ids_for_tags(self, tags):
+        these_response_ids = []
+        args_tags = tags.split(',')
+
+        for tag in args_tags:
+            tag = tag.strip()
+            if tag:
+                these_response_ids += self.database.get_all_response_ids_by_tag(tag)
+
+        return list(set(these_response_ids))
+
+    def filter_items(self, items):
+        if self.tags:
+            these_response_ids = self.get_all_response_ids_for_tags(self.tags)
+            items = [item for item in items if item['response_id'] in these_response_ids]
+
+        if self.not_tags:
+            these_response_ids = self.get_all_response_ids_for_tags(self.not_tags)
+            items = [item for item in items if item['response_id'] not in these_response_ids]
+
+        return items
+
+    def build_manual_session_items(self, items, progress_map):
+        session_items = [self.merge_progress(dict(item), progress_map) for item in items]
+        random.shuffle(session_items)
+
+        nquestions = self.settings.settings['nquestions']
+
+        if nquestions != 0:
+            if nquestions > len(session_items) and len(session_items) > 0:
+                add = nquestions - len(session_items)
+                duplicates = list(session_items)
+
+                for i in range(add):
+                    duplicates.append(dict(random.choice(session_items)))
+
+                session_items = duplicates
+            else:
+                session_items = session_items[:nquestions]
+
+        for item in session_items:
+            item['level'] = self.level
+            item['session_stage'] = item['current_stage']
+
+        return session_items
+
+    def sort_due_items(self, items):
+        return sorted(
+            items,
+            key=lambda item: (
+                item['next_due_at'] or self.progress_store.now(),
+                item['progress']['mastery_score'],
+                -item['progress']['failure_count'],
+            )
+        )
+
+    def sort_weak_items(self, items):
+        return sorted(
+            items,
+            key=lambda item: (
+                item['progress']['mastery_score'],
+                -item['progress']['failure_count'],
+                item['progress']['reviews'],
+            )
+        )
+
+    def adaptive_session_size(self, total_items):
+        nquestions = self.settings.settings['nquestions']
+
+        if nquestions:
+            return min(nquestions, total_items)
+
+        return min(20, total_items)
+
+    def take_items(self, pool, amount, selected_ids):
+        out = []
+
+        for item in pool:
+            if len(out) >= amount:
+                break
+            if item['item_id'] in selected_ids:
+                continue
+            out.append(item)
+            selected_ids.add(item['item_id'])
+
+        return out
+
+    def build_adaptive_session_items(self, items, progress_map):
+        annotated = [self.merge_progress(dict(item), progress_map) for item in items]
+        due_items = self.sort_due_items([item for item in annotated if item['is_due']])
+        weak_items = self.sort_weak_items([item for item in annotated if item['is_weak'] and not item['is_due']])
+        new_items = [item for item in annotated if item['is_new']]
+        random.shuffle(new_items)
+
+        session_size = self.adaptive_session_size(len(annotated))
+        due_target = min(len(due_items), max(1, int(session_size * 0.6)))
+        weak_target = min(len(weak_items), int(session_size * 0.25))
+        new_target = min(len(new_items), session_size - due_target - weak_target)
+
+        selected_ids = set()
+        session_items = []
+        session_items += self.take_items(due_items, due_target, selected_ids)
+        session_items += self.take_items(weak_items, weak_target, selected_ids)
+        session_items += self.take_items(new_items, new_target, selected_ids)
+
+        remainder_pool = due_items + weak_items + new_items + annotated
+        session_items += self.take_items(remainder_pool, session_size - len(session_items), selected_ids)
+        random.shuffle(session_items)
+
+        for item in session_items:
+            item['session_stage'] = item['current_stage']
+
+        return session_items
+
+    def build_session_items(self, items):
+        item_ids = [item['item_id'] for item in items]
+        progress_map = self.progress_store.get_progress_map(self.study_set_id, item_ids)
+
+        if self.session_mode == 'manual':
+            return self.build_manual_session_items(items, progress_map)
+
+        return self.build_adaptive_session_items(items, progress_map)
+
+    def current_item(self, question_index):
+        return self.session_items[question_index]
+
+    def record_result(self, item, is_correct, elapsed_time):
+        progress = dict(item['progress'])
+        progress['reviews'] = int(progress['reviews']) + 1
+        progress['last_seen_at'] = self.progress_store.to_iso(self.progress_store.now())
+
+        previous_avg = float(progress['average_response_time'])
+        previous_reviews = progress['reviews'] - 1
+        progress['average_response_time'] = (
+            (previous_avg * previous_reviews + elapsed_time) / progress['reviews']
+        )
+
+        stage = int(progress['current_stage'])
+        mastery = float(progress['mastery_score'])
+        streak = int(progress['success_streak'])
+
+        if is_correct:
+            streak += 1
+            progress['success_streak'] = streak
+            progress['failure_count'] = max(0, int(progress['failure_count']) - 1)
+            mastery = min(1.0, mastery + 0.2)
+            required_streak = 2 if stage < 3 else 3
+
+            if streak >= required_streak and stage < 4:
+                stage += 1
+                progress['success_streak'] = 0
+        else:
+            stage = max(0, stage - 1)
+            progress['success_streak'] = 0
+            progress['failure_count'] = int(progress['failure_count']) + 1
+            progress['lapse_count'] = int(progress['lapse_count']) + 1
+            mastery = max(0.0, mastery - 0.25)
+
+        progress['current_stage'] = stage
+        progress['mastery_score'] = mastery
+        progress['next_due_at'] = self.progress_store.next_due(stage, is_correct)
+
+        item['progress'] = progress
+        item['current_stage'] = stage
+        item['level'] = self.level if self.session_mode == 'manual' else self.level_for_stage(stage)
+        item['stage_label'] = self.stage_label(stage)
+
+        self.progress_store.update_progress(self.study_set_id, item['item_id'], progress)
 
     def normalize_row(self, row):
         '''Make every string in a row lowercase and remove all whitespace'''
@@ -235,6 +446,9 @@ class Engine:
 
                 indices['tag'] = self.get_indices(this_row, 'tag')
                 indices['mtag'] = self.get_indices(this_row, 'mtag')
+                indices['item_id'] = [self.get_indices(this_row, 'id')]
+                indices['item_id'].append(self.get_indices(this_row, 'id2'))
+                indices['item_id'].append(self.get_indices(this_row, 'id3'))
 
                 # We're done after the header row.
                 break

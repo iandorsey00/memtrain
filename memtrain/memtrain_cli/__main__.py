@@ -31,6 +31,7 @@ class MemtrainCLI():
         self.hints = None
         self.mtags = None
         self.mchoices = None
+        self.current_item = None
 
         # Inter-area margin
         # The character that's printed between CLI interface areas
@@ -41,7 +42,8 @@ class MemtrainCLI():
 
         # Create the top-level argument parser
         parser = argparse.ArgumentParser(
-            description='A program for better memory training')
+            description='A program for better memory training',
+            prog='memtrain')
         parser.set_defaults(func=self.train)
 
         # Create arguments
@@ -108,7 +110,11 @@ class MemtrainCLI():
             print(self.settings.settings['title'])
         else:
             # Print the second row - title and number of responses
-            title_block = self.settings.settings['title'].ljust(59)
+            title = self.settings.settings['title']
+            if self.engine.session_mode == 'adaptive' and self.current_item is not None:
+                title += ' [' + self.current_item['stage_label'] + ']'
+
+            title_block = title.ljust(59)
             self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
             responses_block = (self.response_number_text).rjust(20)
 
@@ -124,6 +130,9 @@ class MemtrainCLI():
     def render_question(self, cue_id, response_id):
         '''Render the question'''
         this_question_id = self.mtstatistics.response_number-1
+        self.current_item = self.engine.current_item(this_question_id)
+        self.settings.level = self.current_item['level']
+        self.settings.current_stage_label = self.current_item['stage_label']
         self.question.main_data_loop(self.cr_id_pairs[this_question_id][0], self.cr_id_pairs[this_question_id][1], self.mtstatistics)
 
         if not self.mtstatistics.is_last_question():
@@ -174,12 +183,13 @@ class MemtrainCLI():
         self.question.validate_input()
 
         # Clear screen.
-        os.system('cls')
+        os.system('cls' if os.name == 'nt' else 'clear')
 
         # If the input is valid, grade input and finalize
         if self.mtstatistics.is_input_valid:
             self.question.grade_input()
             self.mtstatistics.times.append(elasped_time)
+            self.engine.record_result(self.current_item, self.mtstatistics.is_input_correct, elasped_time)
             self.question.finalize()
             f_correctness_str = textwrap.fill(self.question.correctness_str, width=80)
             print(f_correctness_str)
@@ -212,7 +222,7 @@ class MemtrainCLI():
 
     def prompt_for_response(self):
         '''Prompt for a response and return user input'''
-        if self.settings.settings['level1']:
+        if self.settings.level == '1':
             self.question.user_input = input('Enter response choice: ')
         else:
             self.question.user_input = input('Enter response: ')
