@@ -1,3 +1,6 @@
+from memtrain import __version__
+
+
 # SettingError ################################################################
 class SettingError(Exception):
     pass
@@ -5,7 +8,7 @@ class SettingError(Exception):
 class Settings:
     '''Manage settings for memtrain'''
     def __init__(self):
-        self.version = '0.4.0'
+        self.version = __version__
         self.settings = dict()
         self.all_labels = ['title', 'level1', 'level2', 'level3', 'nquestions']
 

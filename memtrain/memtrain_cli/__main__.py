@@ -10,7 +10,7 @@ from memtrain.memtrain_common.engine import Engine
 from memtrain.memtrain_common.question import Question
 
 class MemtrainCLI():
-    def __init__(self):
+    def __init__(self, argv=None):
         # Initalize core objects
         self.engine = None
 
@@ -54,7 +54,7 @@ class MemtrainCLI():
         parser.add_argument('csvfile', help='The CSV file to load')
 
         # Parse arguments
-        self.args = parser.parse_args()
+        self.args = parser.parse_args(argv)
         self.args.func(self.args)
 
     def train(self, args):
@@ -229,4 +229,9 @@ class MemtrainCLI():
 
         self.question.user_input = self.question.user_input.lower()
 
-mtcli = MemtrainCLI()
+def main(argv=None):
+    MemtrainCLI(argv)
+
+
+if __name__ == '__main__':
+    main()

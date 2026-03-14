@@ -1,23 +1,25 @@
 import tkinter as tk
-import tkinter.messagebox as tk_messagebox
 import tkinter.filedialog as tk_filedialog
+import tkinter.messagebox as tk_messagebox
 import tkinter.ttk as tk_ttk
 
 import time
 
-from functools import partial
 from datetime import timedelta
+from functools import partial
 from statistics import mean
 
 from memtrain.memtrain_common.engine import Engine
 from memtrain.memtrain_common.question import Question
 
+
 class MemtrainGUI:
+    '''Tk GUI for memtrain.'''
+
     def __init__(self):
-        '''Initialize main variables and the configuration window'''
         self.root = tk.Tk()
-        self.root.minsize(300, 100)
-        self.root.title('memtrain v0.4.0')
+        self.root.title('memtrain v0.4.1')
+        self.root.minsize(720, 420)
 
         self.filename = ''
         self.level = ''
@@ -28,131 +30,182 @@ class MemtrainGUI:
 
         self.start_time = None
         self.end_time = None
+        self.response_entry_placeholder = True
 
-        #
-        # Configuration window
-        #
+        self.configure_styles()
+        self.build_home_ui()
+        self.present_window(self.root, self.select_csv_button)
 
-        # Settings ############################################################
-        self.settings_frame = tk.Frame(master=self.root)
+    def configure_styles(self):
+        self.style = tk_ttk.Style()
 
-        self.settings_label_frame = tk.Frame(master=self.settings_frame)
-        self.settings_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
-        self.settings_label = tk.Label(master=self.settings_label_frame, anchor='w',
-                                       text='(Optional) Configure settings')
-        self.settings_label.pack(fill=tk.X, expand=tk.YES)
+        try:
+            if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
+                self.style.theme_use('aqua')
+            else:
+                self.style.theme_use('clam')
+        except tk.TclError:
+            pass
 
-        self.settings_button_frame = tk.Frame(master=self.settings_frame)
-        self.settings_button = tk.Button(master=self.settings_frame, text='Settings...', padx=10, command=self.configure_settings)
-        self.settings_button.pack()
-        self.settings_button_frame.pack(fill=tk.X, expand=tk.YES)
+        background = '#f6f4ef'
+        surface = '#fbfaf7'
+        muted = '#5f6b76'
+        accent = '#1f6f5f'
 
-        self.settings_frame.pack(fill=tk.X, expand=tk.YES)
+        self.root.configure(background=background)
 
-        self.settings_seperator = tk_ttk.Separator(master=self.root, orient='horizontal')
-        self.settings_seperator.pack(fill=tk.X, expand=tk.YES, pady=(10, 0))
+        self.style.configure('Root.TFrame', background=background)
+        self.style.configure('Card.TFrame', background=surface)
+        self.style.configure('SectionTitle.TLabel', background=background, font=('TkDefaultFont', 13, 'bold'))
+        self.style.configure('CardSectionTitle.TLabel', background=surface, font=('TkDefaultFont', 13, 'bold'))
+        self.style.configure('Muted.TLabel', background=background, foreground=muted)
+        self.style.configure('CardTitle.TLabel', background=surface, font=('TkDefaultFont', 14, 'bold'))
+        self.style.configure('CardBody.TLabel', background=surface, font=('TkDefaultFont', 12))
+        self.style.configure('Meta.TLabel', background=surface, foreground=muted, font=('TkDefaultFont', 11))
+        self.style.configure('Choice.TButton', padding=(10, 8))
+        self.style.configure('Primary.TButton', padding=(14, 10))
+        self.style.configure('Start.TButton', padding=(12, 8))
+        self.style.map('Primary.TButton', foreground=[('!disabled', accent)])
 
-        # Step 1 ##############################################################
-        self.step_1_frame = tk.Frame(master=self.root)
+    def present_window(self, window, focus_widget=None):
+        window.update_idletasks()
+        window.lift()
+        window.after_idle(window.lift)
 
-        self.step_1_label_frame = tk.Frame(master=self.step_1_frame)
-        self.step_1_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
-        self.step_1_label = tk.Label(master=self.step_1_label_frame, anchor='w',
-                                     text='Step 1. Select file')
-        self.step_1_label.pack(fill=tk.X, expand=tk.YES)
+        if focus_widget is not None:
+            window.after_idle(focus_widget.focus_set)
 
-        self.step_1_button_frame = tk.Frame(master=self.step_1_frame)
-        self.select_csv_button = tk.Button(master=self.step_1_button_frame, text='Select CSV file', padx=10, command=self.select_csv)
-        self.select_csv_button.pack()
-        self.step_1_button_frame.pack(fill=tk.X, expand=tk.YES)
+    def build_home_ui(self):
+        self.root_frame = tk_ttk.Frame(self.root, style='Root.TFrame', padding=20)
+        self.root_frame.pack(fill=tk.BOTH, expand=tk.YES)
+        self.root_frame.columnconfigure(0, weight=1)
 
-        self.step_1_filename_frame = tk.Frame(master=self.step_1_frame)
-        self.step_1_filename_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
-        self.step_1_filename_label = tk.Label(master=self.step_1_filename_frame, text='No file selected.', anchor='w')
-        self.step_1_filename_label.pack(fill=tk.X, expand=tk.YES)
+        header = tk_ttk.Frame(self.root_frame, style='Root.TFrame')
+        header.grid(row=0, column=0, sticky='ew')
+        header.columnconfigure(0, weight=1)
 
-        self.step_1_frame.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Label(header, text='memtrain', style='SectionTitle.TLabel').grid(row=0, column=0, sticky='w')
+        tk_ttk.Label(
+            header,
+            text='Structured recall practice with adaptive study or fixed review modes.',
+            style='Muted.TLabel'
+        ).grid(row=1, column=0, sticky='w', pady=(6, 0))
 
-        self.select_csv_button.focus_set()
+        self.settings_card = tk_ttk.LabelFrame(self.root_frame, text='Settings', padding=16)
+        self.settings_card.grid(row=1, column=0, sticky='ew', pady=(20, 12))
+        self.settings_card.columnconfigure(0, weight=1)
 
-        self.step_1_seperator = tk_ttk.Separator(master=self.root, orient='horizontal')
-        self.step_1_seperator.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Label(
+            self.settings_card,
+            text='Adjust question count or focus the session with tags.',
+            style='Muted.TLabel'
+        ).grid(row=0, column=0, sticky='w')
+        tk_ttk.Button(
+            self.settings_card,
+            text='Open Settings',
+            command=self.configure_settings
+        ).grid(row=0, column=1, sticky='e', padx=(12, 0))
 
-        # Step 2 ##############################################################
-        self.step_2_frame = tk.Frame(master=self.root)
+        self.file_card = tk_ttk.LabelFrame(self.root_frame, text='Step 1: Study Set', padding=16)
+        self.file_card.grid(row=2, column=0, sticky='ew', pady=(0, 12))
+        self.file_card.columnconfigure(0, weight=1)
 
-        self.step_2_label_frame = tk.Frame(master=self.step_2_frame)
-        self.step_2_label_frame.pack(fill=tk.BOTH, expand=tk.YES, pady=10)
-        self.step_2_label = tk.Label(master=self.step_2_label_frame, anchor='w',
-                                    text='Step 2. Start adaptive study or choose a fixed level')
-        self.step_2_label.pack(fill=tk.X, expand=tk.YES)
+        self.select_csv_button = tk_ttk.Button(
+            self.file_card,
+            text='Choose CSV Study Set',
+            command=self.select_csv
+        )
+        self.select_csv_button.grid(row=0, column=0, sticky='w')
+
+        self.step_1_filename_label = tk_ttk.Label(
+            self.file_card,
+            text='No file selected.',
+            style='Muted.TLabel',
+            wraplength=640
+        )
+        self.step_1_filename_label.grid(row=1, column=0, sticky='ew', pady=(12, 0))
+
+        self.start_card = tk_ttk.LabelFrame(self.root_frame, text='Step 2: Start Session', padding=16)
+        self.start_card.grid(row=3, column=0, sticky='ew')
+        self.start_card.columnconfigure(0, weight=1)
+
+        tk_ttk.Label(
+            self.start_card,
+            text='Adaptive mode chooses the prompt level for each item. Fixed modes keep the whole session at one level.',
+            style='Muted.TLabel',
+            wraplength=640,
+            justify=tk.LEFT
+        ).grid(row=0, column=0, sticky='w')
+
+        buttons = tk_ttk.Frame(self.start_card, style='Root.TFrame')
+        buttons.grid(row=1, column=0, sticky='w', pady=(14, 0))
 
         start_adaptive = partial(self.start_level, '')
         start_level_1 = partial(self.start_level, '1')
         start_level_2 = partial(self.start_level, '2')
         start_level_3 = partial(self.start_level, '3')
 
-        # Wait until CSV is loaded to change buttons into normal state.
-        self.step_2_button_frame = tk.Frame(master=self.step_2_frame)
-        self.adaptive_button = tk.Button(master=self.step_2_button_frame, text='Adaptive',
-                                        padx=10, state=tk.DISABLED, command=start_adaptive)
-        self.adaptive_button.pack(side=tk.LEFT)
-        self.level_1_button = tk.Button(master=self.step_2_button_frame, text='Level 1',
-                                        padx=10, state=tk.DISABLED, command=start_level_1)
-        self.level_1_button.pack(side=tk.LEFT)
-        self.level_2_button = tk.Button(master=self.step_2_button_frame, text='Level 2',
-                                        padx=10, state=tk.DISABLED, command=start_level_2)
-        self.level_2_button.pack(side=tk.LEFT)
-        self.level_3_button = tk.Button(master=self.step_2_button_frame, text='Level 3',
-                                        padx=10, state=tk.DISABLED, command=start_level_3)
-        self.level_3_button.pack(side=tk.LEFT)
-        self.step_2_button_frame.pack(expand=tk.YES)
+        self.adaptive_button = tk_ttk.Button(
+            buttons, text='Adaptive', command=start_adaptive, style='Primary.TButton', state=tk.DISABLED
+        )
+        self.adaptive_button.grid(row=0, column=0, padx=(0, 8))
 
-        self.step_2_frame.pack(fill=tk.X, expand=tk.YES, pady=(0, 10))
+        self.level_1_button = tk_ttk.Button(
+            buttons, text='Level 1', command=start_level_1, style='Start.TButton', state=tk.DISABLED
+        )
+        self.level_1_button.grid(row=0, column=1, padx=(0, 8))
+
+        self.level_2_button = tk_ttk.Button(
+            buttons, text='Level 2', command=start_level_2, style='Start.TButton', state=tk.DISABLED
+        )
+        self.level_2_button.grid(row=0, column=2, padx=(0, 8))
+
+        self.level_3_button = tk_ttk.Button(
+            buttons, text='Level 3', command=start_level_3, style='Start.TButton', state=tk.DISABLED
+        )
+        self.level_3_button.grid(row=0, column=3)
 
     def configure_settings(self):
-        '''A window for more advanced settings'''
-        self.settings_window = tk.Toplevel(self.root)
-        self.settings_window.title('Settings')
+        if hasattr(self, 'settings_window') and self.settings_window.winfo_exists():
+            self.present_window(self.settings_window, self.nquestions_entry)
+            return
 
-        ### nquestions - Number of questions
-        self.nquestions_label = tk.Label(master=self.settings_window, text='Number of questions (an integer greater than zero)', anchor='w')
-        self.nquestions_label.pack(fill=tk.X, expand=tk.YES)
-        
-        # nquestions validation command
+        self.settings_window = tk.Toplevel(self.root)
+        self.settings_window.title('Session Settings')
+        self.settings_window.transient(self.root)
+        self.settings_window.resizable(False, False)
+
+        frame = tk_ttk.Frame(self.settings_window, padding=20)
+        frame.pack(fill=tk.BOTH, expand=tk.YES)
+        frame.columnconfigure(1, weight=1)
+
+        tk_ttk.Label(frame, text='Questions', style='SectionTitle.TLabel').grid(row=0, column=0, sticky='w', columnspan=2)
+        tk_ttk.Label(
+            frame,
+            text='Leave blank to use the adaptive default session size.',
+            style='Muted.TLabel'
+        ).grid(row=1, column=0, sticky='w', columnspan=2, pady=(4, 12))
+
         vcmd = (self.settings_window.register(self.nquestions_validate), '%P')
 
-        self.nquestions_entry = tk.Entry(master=self.settings_window, validate='key', validatecommand=vcmd)
-        self.nquestions_entry.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Label(frame, text='Number of questions').grid(row=2, column=0, sticky='w', pady=(0, 10))
+        self.nquestions_entry = tk_ttk.Entry(frame, validate='key', validatecommand=vcmd)
+        self.nquestions_entry.grid(row=2, column=1, sticky='ew', pady=(0, 10))
 
-        ### Tags to be included
-        self.tags_label = tk.Label(master=self.settings_window, text="Include the following tags (seperated by a comma ',')", anchor='w')
-        self.tags_label.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Label(frame, text='Include tags').grid(row=3, column=0, sticky='w', pady=(0, 10))
+        self.tags_entry = tk_ttk.Entry(frame)
+        self.tags_entry.grid(row=3, column=1, sticky='ew', pady=(0, 10))
 
-        self.tags_entry = tk.Entry(master=self.settings_window)
-        self.tags_entry.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Label(frame, text='Exclude tags').grid(row=4, column=0, sticky='w')
+        self.not_tags_entry = tk_ttk.Entry(frame)
+        self.not_tags_entry.grid(row=4, column=1, sticky='ew')
 
-        ### Tags not to be included
-        self.not_tags_label = tk.Label(master=self.settings_window, text="Do not include the following tags (seperated by a comma ',')", anchor='w')
-        self.not_tags_label.pack(fill=tk.X, expand=tk.YES)
+        buttons = tk_ttk.Frame(frame)
+        buttons.grid(row=5, column=0, columnspan=2, sticky='e', pady=(18, 0))
 
-        self.not_tags_entry = tk.Entry(master=self.settings_window)
-        self.not_tags_entry.pack(fill=tk.X, expand=tk.YES)
+        tk_ttk.Button(buttons, text='Clear', command=self.clear_settings).grid(row=0, column=0, padx=(0, 8))
+        tk_ttk.Button(buttons, text='Save', command=self.commit_settings, style='Primary.TButton').grid(row=0, column=1)
 
-        ### Buttons
-        self.settings_buttons_frame = tk.Frame(master=self.settings_window)
-
-        self.clear_settings_button = tk.Button(master=self.settings_buttons_frame, text='Clear settings',
-                                               command=self.clear_settings)
-        self.clear_settings_button.pack(side=tk.LEFT)
-
-        self.ok_button = tk.Button(master=self.settings_buttons_frame, text='OK',
-                                               command=self.commit_settings)
-        self.ok_button.pack(side=tk.LEFT)
-
-        self.settings_buttons_frame.pack()
-
-        # If we have values set already, fill them in.
         if self.nquestions != '':
             self.nquestions_entry.insert(0, self.nquestions)
         if self.tags != '':
@@ -160,354 +213,356 @@ class MemtrainGUI:
         if self.not_tags != '':
             self.not_tags_entry.insert(0, self.not_tags)
 
-        # Set focus for better usability.
-        self.nquestions_entry.focus_set()
+        self.present_window(self.settings_window, self.nquestions_entry)
 
     def clear_settings(self):
-        '''Clear all settings Entries'''
         self.nquestions_entry.delete(0, tk.END)
         self.tags_entry.delete(0, tk.END)
         self.not_tags_entry.delete(0, tk.END)
 
     def commit_settings(self):
-        '''Write settings'''
         self.nquestions = self.nquestions_entry.get()
         self.tags = self.tags_entry.get()
         self.not_tags = self.not_tags_entry.get()
         self.settings_window.destroy()
 
-    def nquestions_validate(self, input):
-        '''Determine what values can be input into the nquestions Entry'''
-        if input == '':
+    def nquestions_validate(self, input_value):
+        if input_value == '':
             return True
-        else:
-            try:
-                int(input)
-                if int(input) > 0:
-                    return True
-                else:
-                    return False
-            except ValueError:
-                return False
+        try:
+            return int(input_value) > 0
+        except ValueError:
+            return False
 
     def initialize_engine_and_core_objects(self):
-        '''Initialize the engine and core objects'''
-        # Initialize Engine - memtrain.memtrain_common.engine
         self.engine = Engine(self.filename, self.level, self.nquestions, self.tags, self.not_tags)
-
-        # Initialize core objects
         self.settings = self.engine.settings
         self.database = self.engine.database
         self.mtstatistics = self.engine.mtstatistics
         self.cr_id_pairs = self.engine.cr_id_pairs
-
         self.question = Question(self.settings, self.database)
 
     def select_csv(self):
-        '''The interface for CSV selection'''
-        self.filename = tk_filedialog.askopenfilename(title='Select a memtrain CSV file',
-                filetypes=(('CSV files', '*.csv'),))
-        self.step_1_filename_label.configure(text='Selected file: ' + self.filename)
+        self.filename = tk_filedialog.askopenfilename(
+            parent=self.root,
+            title='Select a memtrain CSV file',
+            filetypes=(('CSV files', '*.csv'),)
+        )
 
-        self.initialize_engine_and_core_objects()
+        if not self.filename:
+            self.step_1_filename_label.configure(text='No file selected.')
+            return
 
-        # Whether or not levels are enabled
-        settings_truth_list = [self.settings.settings['level1'],
-                               self.settings.settings['level2'],
-                               self.settings.settings['level3']]
+        self.step_1_filename_label.configure(text=self.filename)
 
-        # Enable buttons now that we have loaded the file.
-        self.adaptive_button.configure(state=tk.NORMAL)
-        if self.settings.settings['level1'] == True:
-            self.level_1_button.configure(state=tk.NORMAL)
-        if self.settings.settings['level2'] == True:
-            self.level_2_button.configure(state=tk.NORMAL)
-        if self.settings.settings['level3'] == True:
-            self.level_3_button.configure(state=tk.NORMAL)
+        try:
+            self.initialize_engine_and_core_objects()
+        except Exception as exc:
+            self.step_1_filename_label.configure(text='Failed to load file.')
+            tk_messagebox.showerror('Unable to load study set', str(exc), parent=self.root)
+            return
 
+        self.configure_start_buttons()
         self.adaptive_button.focus_set()
 
+    def configure_start_buttons(self):
+        self.adaptive_button.configure(state=tk.NORMAL)
+        self.level_1_button.configure(state=tk.NORMAL if self.settings.settings['level1'] else tk.DISABLED)
+        self.level_2_button.configure(state=tk.NORMAL if self.settings.settings['level2'] else tk.DISABLED)
+        self.level_3_button.configure(state=tk.NORMAL if self.settings.settings['level3'] else tk.DISABLED)
+
     def start_level(self, level):
-        '''Start a level'''
+        if not self.filename:
+            tk_messagebox.showinfo('Select a study set', 'Choose a CSV file before starting.', parent=self.root)
+            return
+
         self.level = level
-        
-        self.initialize_engine_and_core_objects()
 
-        # Create the training window
+        try:
+            self.initialize_engine_and_core_objects()
+        except Exception as exc:
+            tk_messagebox.showerror('Unable to start session', str(exc), parent=self.root)
+            return
+
+        self.build_training_window()
+        self.render_question()
+        self.present_window(self.training_window)
+
+    def build_training_window(self):
         self.training_window = tk.Toplevel(self.root)
+        self.training_window.transient(self.root)
+        self.training_window.title('memtrain study')
+        self.training_window.minsize(840, 560)
 
-        # Upper area ##########################################################
-        self.upper_frame = tk.Frame(master=self.training_window)
-        self.upper_frame.columnconfigure(0, weight=1)
-        self.upper_frame.columnconfigure(1, weight=1)
+        outer = tk_ttk.Frame(self.training_window, padding=18)
+        outer.pack(fill=tk.BOTH, expand=tk.YES)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(1, weight=1)
 
-        self.title_frame = tk.Frame(master=self.upper_frame)
-        self.title_frame.grid(row=0, column=0, sticky='nsew')
-        self.title_label = tk.Label(master=self.title_frame, anchor='w')
-        self.title_label.pack(fill=tk.X, expand=tk.YES)
+        self.summary_card = tk_ttk.Frame(outer, style='Card.TFrame', padding=18)
+        self.summary_card.grid(row=0, column=0, sticky='ew')
+        self.summary_card.columnconfigure(0, weight=1)
+        self.summary_card.columnconfigure(1, weight=0)
 
-        self.level_frame = tk.Frame(master=self.upper_frame)
-        self.level_frame.grid(row=0, column=1, sticky='nsew')
-        self.level_label = tk.Label(master=self.level_frame, anchor='e')
-        self.level_label.pack(fill=tk.X)
+        self.title_label = tk_ttk.Label(self.summary_card, style='CardTitle.TLabel')
+        self.title_label.grid(row=0, column=0, sticky='w')
 
-        self.response_number_frame = tk.Frame(master=self.upper_frame)
-        self.response_number_frame.grid(row=1, column=0, sticky='nsew')
-        self.response_number_label = tk.Label(master=self.response_number_frame, anchor='w')
-        self.response_number_label.pack(fill=tk.X)
+        self.level_label = tk_ttk.Label(self.summary_card, style='CardTitle.TLabel')
+        self.level_label.grid(row=0, column=1, sticky='e')
 
-        self.correct_number_frame = tk.Frame(master=self.upper_frame)
-        self.correct_number_frame.grid(row=1, column=1, sticky='nsew')
-        self.correct_number_label = tk.Label(master=self.correct_number_frame, anchor='e')
-        self.correct_number_label.pack(fill=tk.X)
+        self.response_number_label = tk_ttk.Label(self.summary_card, style='Meta.TLabel')
+        self.response_number_label.grid(row=1, column=0, sticky='w', pady=(6, 0))
 
-        self.upper_frame.pack(fill=tk.X)
+        self.correct_number_label = tk_ttk.Label(self.summary_card, style='Meta.TLabel')
+        self.correct_number_label.grid(row=1, column=1, sticky='e', pady=(6, 0))
 
-        # Middle area #########################################################
-        self.middle_frame = tk.Frame(master=self.training_window)
+        self.prompt_card = tk_ttk.Frame(outer, style='Card.TFrame', padding=22)
+        self.prompt_card.grid(row=1, column=0, sticky='nsew', pady=(14, 0))
+        self.prompt_card.columnconfigure(0, weight=1)
+        self.prompt_card.rowconfigure(0, weight=1)
 
-        self.cue_text_widget = tk.Text(master=self.middle_frame, width=75, height=8, font=('Arial', 10),
-                                       borderwidth=15, relief=tk.FLAT)
-        self.cue_text_widget.insert(tk.END, 'This is the text of the question.')
-        self.cue_text_widget.pack(fill=tk.BOTH, expand=tk.YES)
+        self.cue_label = tk_ttk.Label(
+            self.prompt_card,
+            style='CardBody.TLabel',
+            justify=tk.LEFT,
+            wraplength=760
+        )
+        self.cue_label.grid(row=0, column=0, sticky='nw')
 
-        self.hint_frame = tk.Frame(master=self.middle_frame)
-        self.hint_label = tk.Label(master=self.hint_frame, text='Hint(s):', anchor='w')
-        self.hint_label.pack(side=tk.LEFT)
-        self.hint_text_label = tk.Label(master=self.hint_frame, anchor='w', padx=10)
-        self.hint_text_label.pack(side=tk.LEFT, fill=tk.X, expand=tk.YES)
+        self.feedback_label = tk_ttk.Label(
+            self.prompt_card,
+            style='CardBody.TLabel',
+            justify=tk.LEFT,
+            wraplength=760
+        )
+        self.feedback_label.grid(row=1, column=0, sticky='ew', pady=(20, 0))
+        self.feedback_label.configure(text='After your first response, result feedback will appear here.')
 
-        self.correctness_frame = tk.Frame(master=self.middle_frame)
-        self.correctness_frame.pack(fill=tk.X, expand=tk.YES)
-        self.correctness_label = tk.Label(master=self.correctness_frame, anchor='w')
-        self.correctness_label.pack(fill=tk.BOTH, expand=tk.YES)
-        self.correctness_label.configure(text='After your first response, correctness information will appear here.')
+        self.other_answers_label = tk_ttk.Label(
+            self.prompt_card,
+            style='Meta.TLabel',
+            justify=tk.LEFT,
+            wraplength=760
+        )
+        self.other_answers_label.grid(row=2, column=0, sticky='ew', pady=(8, 0))
 
-        self.other_answers_frame = tk.Frame(master=self.middle_frame)
-        self.other_answers_frame.pack(fill=tk.X, expand=tk.YES)
-        self.other_answers_label = tk.Label(master=self.other_answers_frame, anchor='w')
-        self.other_answers_label.pack(fill=tk.BOTH, expand=tk.YES)
+        self.hint_frame = tk_ttk.Frame(self.prompt_card, style='Card.TFrame')
+        self.hint_frame.grid(row=3, column=0, sticky='ew', pady=(20, 0))
+        self.hint_frame.columnconfigure(1, weight=1)
+        self.hint_title_label = tk_ttk.Label(self.hint_frame, text='Hint', style='CardSectionTitle.TLabel')
+        self.hint_title_label.grid(row=0, column=0, sticky='nw')
+        self.hint_text_label = tk_ttk.Label(
+            self.hint_frame,
+            style='CardBody.TLabel',
+            justify=tk.LEFT,
+            wraplength=680
+        )
+        self.hint_text_label.grid(row=0, column=1, sticky='ew', padx=(12, 0))
 
-        self.middle_frame.pack()
+        self.response_card = tk_ttk.Frame(outer, style='Card.TFrame', padding=18)
+        self.response_card.grid(row=2, column=0, sticky='ew', pady=(14, 0))
+        self.response_card.columnconfigure(0, weight=1)
 
-        # Bottom area #########################################################
-        self.bottom_frame = tk.Frame(master=self.training_window)
+        self.mchoices_frame = tk_ttk.Frame(self.response_card, style='Card.TFrame')
+        self.mchoices_frame.grid(row=0, column=0, sticky='ew')
+        self.mchoices_frame.columnconfigure(1, weight=1)
 
-        self.bottom_frame.columnconfigure(0, weight=1)
-        self.mchoices_frame = tk.Frame(master=self.bottom_frame)
-        self.mchoices_frame.grid(row=0, column=0, sticky='nsew')
-        self.mchoices_frame.columnconfigure(0, weight=0)
-        self.mchoices_frame.columnconfigure(1, weight=2)
-
-        self.response_frame = tk.Frame(master=self.bottom_frame)
+        self.response_frame = tk_ttk.Frame(self.response_card, style='Card.TFrame')
+        self.response_frame.grid(row=0, column=0, sticky='ew')
         self.response_frame.columnconfigure(0, weight=1)
 
-        self.response_entry_placeholder = False
-
-        self.response_entry = tk.Entry(master=self.response_frame, font='Arial 9 italic')
-        self.response_entry.insert(0, 'Enter response')
-        self.response_entry_placeholder = True
-        self.response_entry.grid(row=2, column=0, sticky='nsew')
+        self.response_entry = tk_ttk.Entry(self.response_frame)
+        self.response_entry.grid(row=0, column=0, sticky='ew')
         self.response_entry.bind('<Key>', self.response_key)
         self.response_entry.bind('<KeyRelease>', self.response_keyrelease)
         self.response_entry.bind('<FocusIn>', self.response_focusin)
-        self.response_entry.icursor(0)
 
-        self.button = tk.Button(master=self.response_frame, text='Go', bg='green', fg='white', padx=10, command=self.submit)
-        self.button.grid(row=2, column=1)
+        self.button = tk_ttk.Button(
+            self.response_frame,
+            text='Submit',
+            command=self.submit,
+            style='Primary.TButton'
+        )
+        self.button.grid(row=0, column=1, padx=(10, 0))
         self.training_window.bind('<Return>', self.submit)
 
-        self.response_frame.grid(row=2, column=0, sticky='nsew')
-        self.response_frame.grid_remove()
-
-        self.bottom_frame.pack(fill=tk.X)
-        self.render_question()
+        self.response_clear()
 
     def response_key(self, event=None):
-        '''Triggered by <Key>, before sending the event to the widget'''
-        # If the key pressed isn't a special key, remove placeholder and
-        # unitalicize widget text
-        if self.response_entry_placeholder == True and event.char != "":
+        if self.response_entry_placeholder and event.char != '':
             self.response_entry.delete(0, tk.END)
-            self.response_entry.configure(font='Arial 9')
             self.response_entry_placeholder = False
 
     def response_keyrelease(self, event=None):
-        '''Triggered by <KeyRelease>, before sending the event to the widget'''
-        # If widget is empty, italicize font, then insert placeholder
-        if self.response_entry_placeholder == False and len(self.response_entry.get()) == 0:
-            self.response_entry.configure(font='Arial 9 italic')
-            self.response_entry.insert(0, 'Enter response')
-            self.response_entry_placeholder = True
-            self.response_entry.icursor(0)
+        if not self.response_entry_placeholder and len(self.response_entry.get()) == 0:
+            self.response_clear()
 
     def response_focusin(self, event=None):
-        '''Triggered by placing focus on the widget'''
-        if self.response_entry_placeholder == True:
+        if self.response_entry_placeholder:
             self.response_entry.icursor(0)
 
     def response_clear(self):
-        '''Clear the response Entry'''
         self.response_entry.delete(0, tk.END)
-        self.response_entry.configure(font='Arial 9 italic')
         self.response_entry.insert(0, 'Enter response')
         self.response_entry_placeholder = True
         self.response_entry.icursor(0)
 
-    def set_cue_text_widget_content(self, content):
-        '''Set cue Text widget content'''
-        self.cue_text_widget.delete(1.0, tk.END)
-        self.cue_text_widget.insert(tk.END, content)
-
     def clear_mchoices(self):
         if hasattr(self, 'mchoice_buttons'):
-            for letter, mchoice_button in self.mchoice_buttons.items():
-                mchoice_button.destroy()
+            for button in self.mchoice_buttons.values():
+                button.destroy()
         if hasattr(self, 'mchoice_labels'):
-            for letter, mchoice_label in self.mchoice_labels.items():
-                mchoice_label.destroy()
+            for label in self.mchoice_labels.values():
+                label.destroy()
 
     def configure_prompt_area(self):
         if self.settings.level == '1':
             self.response_frame.grid_remove()
             self.mchoices_frame.grid()
-            self.hint_frame.pack_forget()
+            self.hint_frame.grid_remove()
         else:
             self.mchoices_frame.grid_remove()
             self.response_frame.grid()
             self.response_entry.focus_set()
 
             if self.settings.level == '2':
-                self.hint_frame.pack(fill=tk.X, expand=tk.YES)
+                self.hint_frame.grid()
             else:
-                self.hint_frame.pack_forget()
+                self.hint_frame.grid_remove()
 
     def render_question(self):
-        '''Render the question and process the necessary data to do so'''
-        # Data processing #####################################################
-        # Important: The question we are on
-        this_question_id = self.mtstatistics.response_number-1
+        question_index = self.mtstatistics.response_number - 1
 
-        # See memtrain.memtrain_common.question
-        # This method is responsible for processing the data needed to render
-        # the question.
-        self.current_item = self.engine.current_item(this_question_id)
+        self.current_item = self.engine.current_item(question_index)
         self.settings.level = self.current_item['level']
         self.settings.current_stage_label = self.current_item['stage_label']
-        self.question.main_data_loop(self.cr_id_pairs[this_question_id][0], self.cr_id_pairs[this_question_id][1], self.mtstatistics)
+        self.question.main_data_loop(
+            self.cr_id_pairs[question_index][0],
+            self.cr_id_pairs[question_index][1],
+            self.mtstatistics
+        )
 
-        # Change Labels and Text widget text
         title_text = self.question.title_text
         if self.engine.session_mode == 'adaptive':
             title_text += ' [' + self.current_item['stage_label'] + ']'
+
         self.title_label.configure(text=title_text)
         self.level_label.configure(text=self.question.level_text)
         self.response_number_label.configure(text=self.question.response_number_text)
         self.correct_number_label.configure(text=self.question.correct_so_far_text)
-        self.set_cue_text_widget_content(self.question.cue_text)
+        self.cue_label.configure(text=self.question.cue_text)
         self.configure_prompt_area()
 
-        # For level 2, display hints
         if self.settings.level == '2':
-            these_hints = '; '.join(self.question.hints)
-            self.hint_text_label.configure(text=these_hints)
+            self.hint_text_label.configure(text='; '.join(self.question.hints))
 
-        # For level 1, display multiple choices
         self.clear_mchoices()
 
         if self.settings.level == '1':
             self.question.mchoices = self.question.generate_mchoices()
+            self.mchoice_buttons = {}
+            self.mchoice_labels = {}
 
-            counter = 0
+            for row_index, (letter, choice) in enumerate(self.question.mchoices.items()):
+                command = partial(self.submit, mchoice_letter=letter)
+                self.training_window.bind(letter, command)
 
-            # Store mchoice data in dictionaries
-            self.mchoice_buttons = dict()
-            mchoice_commands = dict()
-            self.mchoice_labels = dict()
+                button = tk_ttk.Button(
+                    self.mchoices_frame,
+                    text=letter.upper(),
+                    command=command,
+                    style='Choice.TButton',
+                    width=4
+                )
+                button.grid(row=row_index, column=0, sticky='w', pady=(0, 8))
 
-            # Iterate through mchoices
-            for letter, choice in self.question.mchoices.items():
-                mchoice_commands[letter] = partial(self.submit, mchoice_letter=letter)
-                # Make it so you can press a, b, c, d to select a choice
-                self.training_window.bind(letter, mchoice_commands[letter])
-                self.mchoice_buttons[letter] = tk.Button(master=self.mchoices_frame, text=letter,
-                                                    padx=10, command=mchoice_commands[letter])
-                self.mchoice_buttons[letter].grid(row=counter, column=0, sticky='nsew')
-                self.mchoice_labels[letter] = tk.Label(master=self.mchoices_frame, text=choice, padx=10, anchor='w')
-                self.mchoice_labels[letter].grid(row=counter, column=1, sticky='w')
+                label = tk_ttk.Label(
+                    self.mchoices_frame,
+                    text=choice,
+                    style='CardBody.TLabel',
+                    wraplength=660
+                )
+                label.grid(row=row_index, column=1, sticky='w', padx=(12, 0), pady=(0, 8))
 
-                counter += 1
+                self.mchoice_buttons[letter] = button
+                self.mchoice_labels[letter] = label
 
             self.mchoice_buttons['a'].focus_set()
 
         self.start_time = time.time()
 
     def submit(self, event=None, mchoice_letter=None):
-        '''Submit response'''
         if self.settings.level == '1':
             self.question.user_input = mchoice_letter
         else:
-            self.question.user_input = self.response_entry.get().lower()
+            if self.response_entry_placeholder:
+                self.question.user_input = ''
+            else:
+                self.question.user_input = self.response_entry.get().lower()
 
-        # Validate input
         self.question.validate_input()
 
         if self.mtstatistics.is_input_valid:
-            # Calculate the amount of time elapsed and store it
             self.end_time = time.time()
             elapsed_time = self.end_time - self.start_time
             self.mtstatistics.times.append(elapsed_time)
 
-            # Grade input and do finalization work
             self.question.grade_input()
             self.engine.record_result(self.current_item, self.mtstatistics.is_input_correct, elapsed_time)
             self.question.finalize()
-            self.correctness_label.configure(text=self.question.correctness_str)
 
-            if self.mtstatistics.has_synonym_been_used():
+            self.feedback_label.configure(text=self.question.correctness_str)
+            if self.mtstatistics.has_synonym_been_used() or self.question.synonyms:
                 self.other_answers_label.configure(text=self.question.other_answers_str)
             else:
                 self.other_answers_label.configure(text='')
-
         else:
-            tk_messagebox.showinfo('Invalid response', 'Sorry, your response is not valid. Please try again.')
+            tk_messagebox.showinfo(
+                'Invalid response',
+                'Sorry, your response is not valid. Please try again.',
+                parent=self.training_window
+            )
 
-        # Clean up after a question
         if not self.mtstatistics.is_last_question():
-            # Clear response areas
             if self.settings.level != '1':
                 self.response_clear()
-
-            # Get ready for the next question
             self.render_question()
-        # If that was the last question, destroy the training window and
-        # display statistics.
-        else:
-            self.training_window.destroy()
+            return
 
-            msg_box_str  = 'Correct: ' + str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.total) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)\n'
-            msg_box_str += 'Average response time: ' + str(timedelta(seconds=mean(self.mtstatistics.times))) + ' seconds'
-            
-            if(self.mtstatistics.number_incorrect > 0):
-                msg_box_str += '\n'
-                msg_box_str += 'Responses for which answers were incorrect: '
-                msg_box_str += self.mtstatistics.incorrect_responses_as_string()
-            
-            tk_messagebox.showinfo('Training session complete', msg_box_str)
-            
-            # Set the level button focus in the configuration window to the
-            # button for the level just completed
-            if self.level == '1':
-                    self.level_1_button.focus_set()
-            elif self.level == '2':
-                    self.level_2_button.focus_set()
-            elif self.level == '3':
-                    self.level_3_button.focus_set()
-            else:
-                    self.adaptive_button.focus_set()
+        self.training_window.destroy()
+
+        result = 'Correct: {}/{} ({:.1f}%)\n'.format(
+            self.mtstatistics.number_correct,
+            self.mtstatistics.total,
+            round(self.mtstatistics.percentage, 1)
+        )
+        result += 'Average response time: {} seconds'.format(
+            timedelta(seconds=mean(self.mtstatistics.times))
+        )
+
+        if self.mtstatistics.number_incorrect > 0:
+            result += '\nResponses for which answers were incorrect: '
+            result += self.mtstatistics.incorrect_responses_as_string()
+
+        tk_messagebox.showinfo('Training session complete', result, parent=self.root)
+
+        if self.level == '1':
+            self.level_1_button.focus_set()
+        elif self.level == '2':
+            self.level_2_button.focus_set()
+        elif self.level == '3':
+            self.level_3_button.focus_set()
+        else:
+            self.adaptive_button.focus_set()
 
     def tk_mainloop(self):
         self.root.mainloop()
 
-mtgui = MemtrainGUI()
-mtgui.tk_mainloop()
+
+def main():
+    mtgui = MemtrainGUI()
+    mtgui.tk_mainloop()
+
+
+if __name__ == '__main__':
+    main()
