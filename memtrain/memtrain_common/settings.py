@@ -1,84 +1,63 @@
 from memtrain import __version__
 
 
-# SettingError ################################################################
 class SettingError(Exception):
     pass
 
+
 class Settings:
     '''Manage settings for memtrain'''
+
+    BOOLEAN_LABELS = ['level1', 'level2', 'level3']
+    INTEGER_LABELS = ['nquestions']
+    STRING_LABELS = ['title']
+
     def __init__(self):
         self.version = __version__
-        self.settings = dict()
+        self.settings = {
+            'level1': True,
+            'level2': True,
+            'level3': True,
+            'nquestions': 0,
+            'title': '',
+        }
         self.all_labels = ['title', 'level1', 'level2', 'level3', 'nquestions']
-
-        ## Boolean settings
-        self.boolean_labels = ['level1', 'level2', 'level3']
-
-        ### Levels
-
-        ## Whether or not levels are enabled.
-
-        # Level 1 - Multiple choice questions
-        self.settings['level1'] = True
-        # Level 2 - Use a hint to respond
-        self.settings['level2'] = True
-        # Level 3 - Respond on your own
-        self.settings['level3'] = True
-
-        ##
-
-        # The level currently in use.
         self.level = ''
-
-        ## Integer settings
-        self.integer_labels = ['nquestions']
-
-        # nquestions - Number of questions
-        self.settings['nquestions'] = 0
-
-        ## String settings
-        self.string_labels = ['title']
-
-        # Title
-        self.settings['title'] = ''
+        self.session_mode = 'adaptive'
 
     def load_settings(self, settings_row):
         '''Load settings from CSV row'''
-        # Remove all whitespace characters
         settings_row = ''.join(settings_row.split())
         settings_row = settings_row[len('settings:'):]
         settings_row = settings_row.split(',')
 
         for setting in settings_row:
-            # Negated boolean setting
+            if not setting:
+                continue
+
             if setting[0] == '!':
                 label = setting[1:]
-                if label in self.boolean_labels:
+                if label in self.BOOLEAN_LABELS:
                     self.settings[label] = False
                 else:
-                    raise SettingError("'" + setting + "': Invalid setting.")
+                    raise SettingError(f"'{setting}': Invalid setting.")
 
-            # Integer setting
             elif '=' in setting:
-                setting = setting.split('=')
-                label = setting[0]
-                param = int(setting[1])
                 try:
-                    param = int(param)
-                    if label in self.integer_labels:
+                    label, raw_value = setting.split('=', 1)
+                    param = int(raw_value)
+                    if label in self.INTEGER_LABELS:
                         self.settings[label] = param
+                    else:
+                        raise SettingError
                 except (ValueError, SettingError):
-                    raise SettingError("'" + setting + "': Invalid setting.")
+                    raise SettingError(f"'{setting}': Invalid setting.")
 
-            # True boolean setting
-            elif setting in self.boolean_labels:
-                label = setting
-                self.settings[label] = True
+            elif setting in self.BOOLEAN_LABELS:
+                self.settings[setting] = True
 
-            # Else, the setting is invalid.
             else:
-                raise SettingError("'" + setting + "': Invalid setting.")
+                raise SettingError(f"'{setting}': Invalid setting.")
 
     def set_title(self, title_row):
         '''Set the title'''

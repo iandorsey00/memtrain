@@ -24,3 +24,11 @@ memtrain-gui
 ```
 
 More setup and usage notes are in [docs/getting-started.md](docs/getting-started.md).
+
+## Tests
+
+Run the core regression tests with the built-in test runner:
+
+```bash
+python3 -m unittest discover -s tests
+```

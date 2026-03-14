@@ -44,3 +44,11 @@ memtrain-gui
 - On older macOS system Python builds, `--no-build-isolation` avoids pip trying to create a newer isolated build environment first.
 - The GUI opens a file picker, so it does not need a CSV path on the command line.
 - Learner progress is stored in a local `.memtrain-progress.sqlite3` file next to the CSV unless `MEMTRAIN_PROGRESS_DB` is set.
+
+## Tests
+
+Run the automated core tests with:
+
+```bash
+python3 -m unittest discover -s tests
+```

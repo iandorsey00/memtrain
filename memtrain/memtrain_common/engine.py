@@ -1,89 +1,63 @@
-import argparse
 import csv
-import random
-import decimal
-import time
-import string
-import textwrap
 import hashlib
+import random
+import os
 
 from memtrain.memtrain_common.settings import Settings, SettingError
 from memtrain.memtrain_common.database import Database
-from memtrain.memtrain_common.mtstatistics import MtStatistics
+from memtrain.memtrain_common.stats import SessionStatistics
 from memtrain.memtrain_common.progress_store import ProgressStore
 
-import os
 
-# NoResponsesError ############################################################
 class NoResponsesError(Exception):
-    pass
+    '''Raised when no study items match the selected session criteria.'''
 
-# CSVError ####################################################################
+
 class CSVError(Exception):
-    pass
+    '''Raised when the study-set CSV is missing required structure.'''
 
 class Engine:
+    STAGE_LABELS = {
+        0: 'New',
+        1: 'Reinforcing',
+        2: 'Guided recall',
+        3: 'Free recall',
+        4: 'Mature',
+    }
+
     def __init__(self, csvfile, level, nquestions, tags, not_tags):
-        # Initalize core objects
         self.csvfile = csvfile
         self.level = level
         self.nquestions = nquestions
         self.tags = tags
         self.not_tags = not_tags
-        self.stage_labels = {
-            0: 'New',
-            1: 'Reinforcing',
-            2: 'Guided recall',
-            3: 'Free recall',
-            4: 'Mature',
-        }
 
-        # Initialize settings and database
         csv_list = self.load(self.csvfile)
         self.settings = Settings()
         self.database = Database()
         self.progress_store = ProgressStore(self.csvfile)
         self.study_set_id = self.get_study_set_id()
 
-        # Initialize indices dictionary
-        indices = dict()
-        indices['cue'] = []
-        indices['response'] = []
-        indices['synonym'] = []
-        indices['hint'] = []
-        indices['tag'] = []
-        indices['mtag'] = []
-        indices['item_id'] = []
+        indices = {
+            'cue': [],
+            'response': [],
+            'synonym': [],
+            'hint': [],
+            'tag': [],
+            'mtag': [],
+            'item_id': [],
+        }
 
-        # Parse the CSV
         self.set_csv_settings(self.settings, csv_list)
         self.get_csv_column_indices(indices, csv_list)
         self.csv_column_header_row_number = self.get_csv_column_header_row_number(csv_list)
-        data_list = csv_list[self.csv_column_header_row_number+1:]
+        data_list = csv_list[self.csv_column_header_row_number + 1:]
 
         self.database.populate(indices, data_list)
         self.all_items = self.build_item_records(indices, data_list)
 
-        # Now, parse command line settings. ###################################
-
         self.session_mode = 'adaptive'
-
-        # See if we've set a valid level.
-        if self.level:
-            if self.level == '1':
-                if self.settings.settings['level1'] == False:
-                    raise SettingError('Level 1 functionality has been disabled for this CSV.')
-                self.session_mode = 'manual'
-            elif self.level == '2':
-                if self.settings.settings['level2'] == False:
-                    raise SettingError('Level 2 functionality has been disabled for this CSV.')
-                self.session_mode = 'manual'
-            elif self.level == '3':
-                if self.settings.settings['level3'] == False:
-                    raise SettingError('Level 3 functionality has been disabled for this CSV.')
-                self.session_mode = 'manual'
-            else:
-                raise SettingError('Invalid level specified.')
+        self.configure_session_mode()
 
         if self.session_mode == 'manual':
             self.settings.level = self.level
@@ -92,7 +66,6 @@ class Engine:
 
         self.settings.session_mode = self.session_mode
 
-        # Get nquestions if specified.
         if self.nquestions:
             try:
                 if int(self.nquestions) < 0:
@@ -102,18 +75,33 @@ class Engine:
             except ValueError:
                 raise SettingError('Supplied nquestions is not an int.')
 
-        # Main training program ###############################################
         self.filtered_items = self.filter_items(list(self.all_items))
         self.session_items = self.build_session_items(self.filtered_items)
         self.cr_id_pairs = [(item['cue_id'], item['response_id']) for item in self.session_items]
 
-        # MtStatistics
-        self.mtstatistics = MtStatistics()
+        self.mtstatistics = SessionStatistics()
         self.mtstatistics.total = len(self.session_items)
 
-        # Raise NoResponsesError if there are no responses available.
         if self.mtstatistics.total == 0:
             raise NoResponsesError('There are no responses available that match the criteria.')
+
+    def configure_session_mode(self):
+        if not self.level:
+            return
+
+        enabled_levels = {
+            '1': self.settings.settings['level1'],
+            '2': self.settings.settings['level2'],
+            '3': self.settings.settings['level3'],
+        }
+
+        if self.level not in enabled_levels:
+            raise SettingError('Invalid level specified.')
+
+        if not enabled_levels[self.level]:
+            raise SettingError(f'Level {self.level} functionality has been disabled for this CSV.')
+
+        self.session_mode = 'manual'
 
     def get_study_set_id(self):
         normalized = os.path.abspath(self.csvfile)
@@ -131,7 +119,7 @@ class Engine:
         return '3'
 
     def stage_label(self, stage):
-        return self.stage_labels.get(stage, 'Unknown')
+        return self.STAGE_LABELS.get(stage, 'Unknown')
 
     def default_progress(self):
         return {
@@ -178,8 +166,12 @@ class Engine:
                 if not response:
                     continue
 
+                explicit_item_id = ''
+                if placement < len(indices['item_id']) and indices['item_id'][placement]:
+                    explicit_item_id = data_row[indices['item_id'][placement][0]]
+
                 item = {
-                    'item_id': self.build_item_id(cue, response),
+                    'item_id': explicit_item_id or self.build_item_id(cue, response),
                     'cue': cue,
                     'response': response,
                     'cue_id': self.database.get_cue_id(cue),
@@ -361,10 +353,7 @@ class Engine:
 
     def normalize_row(self, row):
         '''Make every string in a row lowercase and remove all whitespace'''
-        # Lowercase row
-        out = list(map(lambda x: x.lower(), row))
-        # Remove whitespace from row and return
-        return list(map(lambda x: ''.join(x.split()), out))
+        return [''.join(value.lower().split()) for value in row]
 
     def load(self, csvfile):
         '''Load the CSV file'''
@@ -383,8 +372,7 @@ class Engine:
 
     def get_index(self, row, target_str):
         '''Get the first index for target_str in a row.'''
-        index = self.get_indices(row, target_str)[:1]
-        return index
+        return self.get_indices(row, target_str)[:1]
 
     def get_index_mandatory(self, row, target_str):
         '''
@@ -394,7 +382,7 @@ class Engine:
         index = self.get_index(row, target_str)
 
         if len(index) < 1:
-            raise CSVError('The mandatory column {} is missing.', target_str)
+            raise CSVError(f'The mandatory column {target_str} is missing.')
         
         return index
 
@@ -405,30 +393,22 @@ class Engine:
     def set_csv_settings(self, settings, csv_list):
         '''Set CSV settings'''
         for row in csv_list:
-            # Only one non-empty string in row
-            if len([item for item in row if len(item) > 0]) == 1:
-                settings_str = self.normalize_row(row)[0]
+            non_empty = [item for item in row if len(item) > 0]
 
-                # If it begins with settings: or Settings:, it's the settings
-                # string
+            if len(non_empty) == 1:
+                settings_str = self.normalize_row(row)[0]
                 if settings_str.startswith('settings:'):
                     settings.load_settings(settings_str)
-                
-                # Otherwise, it's the title row
                 else:
                     settings.set_title(row)
-            
-            # Stop if there is more than one non-empty string
-            elif len([item for item in row if len(item) > 0]) > 1:
+
+            elif len(non_empty) > 1:
                 break
 
     def get_csv_column_indices(self, indices, csv_list):
         '''Get column indices for database processing'''
         for row in csv_list:
             this_row = self.normalize_row(row)
-            
-            # If a row contains 'Cue' and 'Response', it is designated as the
-            # column header row.
             if self.is_header_row(this_row):
                 indices['cue'] = self.get_index_mandatory(this_row, 'cue')
 
@@ -450,7 +430,6 @@ class Engine:
                 indices['item_id'].append(self.get_indices(this_row, 'id2'))
                 indices['item_id'].append(self.get_indices(this_row, 'id3'))
 
-                # We're done after the header row.
                 break
 
     def get_csv_column_header_row_number(self, csv_list):
@@ -460,5 +439,4 @@ class Engine:
             if self.is_header_row(this_row):
                 return row_number
 
-        # It's an error if there is no header row.
         raise CSVError('No header row')

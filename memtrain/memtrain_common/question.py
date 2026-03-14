@@ -1,12 +1,4 @@
-import decimal
 import random
-import string
-import textwrap
-import time
-
-import os
-
-from memtrain.memtrain_common.mtstatistics import MtStatistics
 
 class NoResponsesError(Exception):
     pass
@@ -28,7 +20,6 @@ class Question:
         self.mtags = []
         self.mchoices = dict()
 
-        self.iam = ' '
         self.ascii_range = ['a', 'b', 'c', 'd']
 
         self.response = ''
@@ -160,7 +151,7 @@ class Question:
 
         return self.f_cue
 
-    def main_data_loop(self, cue_id, response_id, mtstatistics, final=False):
+    def main_data_loop(self, cue_id, response_id, mtstatistics):
         '''Main data processing for question rendering'''
 
         # Initialize core objects
@@ -185,10 +176,7 @@ class Question:
         elif self.settings.level == '3':
             self.level_text = 'Level 3'
 
-        if hasattr(self.settings, 'current_stage_label'):
-            self.stage_text = self.settings.current_stage_label
-        else:
-            self.stage_text = ''
+        self.stage_text = getattr(self.settings, 'current_stage_label', '')
 
         # Important text
         self.title_text = self.settings.settings['title']
@@ -331,7 +319,6 @@ class Question:
         if self.mtstatistics.is_input_correct:
             self.mtstatistics.number_correct += 1
             if self.mtstatistics.has_synonym_been_used():
-                self.remaining_synonyms = [i for i in self.synonyms if i != self.mtstatistics.used_synonym]
                 self.correctness_str = 'Correct. Default answer: ' + self.response
             else:
                 self.correctness_str = 'Correct.'
