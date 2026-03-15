@@ -57,7 +57,9 @@ python3 -m unittest discover -s tests
 - [Getting Started](docs/getting-started.md)
 - [Project Overview](docs/overview.md)
 - [Study Set Format](docs/study-set-format.md)
+- [Release Process](docs/release-process.md)
 - [0.5.0 Roadmap](docs/roadmap-0.5.0.md)
+- [Changelog](CHANGELOG.md)
 
 ## macOS note
 

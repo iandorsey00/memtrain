@@ -1,10 +1,13 @@
 import random
 
+
 class NoResponsesError(Exception):
     pass
 
+
 class Question:
-    '''Manages the current cue and response interface'''
+    """Manages the current cue and response interface"""
+
     def __init__(self, settings, database):
         # Initialize core objects
         self.settings = settings
@@ -16,46 +19,50 @@ class Question:
 
         self.cue_id = 0
         self.response_id = 0
-        self.f_cue = ''
+        self.f_cue = ""
         self.mtags = []
         self.mchoices = dict()
 
-        self.ascii_range = ['a', 'b', 'c', 'd']
+        self.ascii_range = ["a", "b", "c", "d"]
 
-        self.response = ''
-        self.user_input = ''
+        self.response = ""
+        self.user_input = ""
         self.synonyms = []
 
         self.plural_responses = [i for i in self.responses if self.is_plural(i)]
         self.nonplural_responses = [i for i in self.responses if not self.is_plural(i)]
 
         ## Interface text
-        self.title_text = ''
-        self.level_text = ''
-        self.response_number_text = ''
-        self.cue_text = ''
-        self.hint_text = ''
-        self.correctness_str = ''
-        self.other_answers_str = ''
-        self.stage_text = ''
+        self.title_text = ""
+        self.level_text = ""
+        self.response_number_text = ""
+        self.cue_text = ""
+        self.hint_text = ""
+        self.correctness_str = ""
+        self.other_answers_str = ""
+        self.stage_text = ""
 
     def get_value(self, value, value_id):
-        self.cur.execute('''SELECT {} FROM {} WHERE {} = (?)'''
-                         .format(value, value + 's', value + '_id'),
-                         (str(value_id), ))
+        self.cur.execute(
+            """SELECT {} FROM {} WHERE {} = (?)""".format(value, value + "s", value + "_id"),
+            (str(value_id),),
+        )
         rows = self.cur.fetchall()
         return rows[0][0]
 
     def get_cue(self, cue_id):
-        return self.get_value('cue', cue_id)
+        return self.get_value("cue", cue_id)
 
     def get_response(self, response_id):
-        return self.get_value('response', response_id)
+        return self.get_value("response", response_id)
 
     def get_hints(self):
         # Translate response_id into hint_id
-        self.cur.execute('''SELECT hint_id FROM responses_to_hints
-                         WHERE response_id = (?)''', (str(self.response_id), ))
+        self.cur.execute(
+            """SELECT hint_id FROM responses_to_hints
+                         WHERE response_id = (?)""",
+            (str(self.response_id),),
+        )
         rows = self.cur.fetchall()
         rows = list(map(lambda x: x[0], rows))
 
@@ -63,14 +70,17 @@ class Question:
 
         # Translate hint_id to hint
         for hint_id in rows:
-            out.append(self.get_value('hint', hint_id))
+            out.append(self.get_value("hint", hint_id))
 
         return out
 
     def get_synonyms(self):
         # Translate response_id into synonym_id
-        self.cur.execute('''SELECT synonym_id FROM responses_to_synonyms
-                         WHERE response_id = (?)''', (str(self.response_id), ))
+        self.cur.execute(
+            """SELECT synonym_id FROM responses_to_synonyms
+                         WHERE response_id = (?)""",
+            (str(self.response_id),),
+        )
         rows = self.cur.fetchall()
         rows = list(map(lambda x: x[0], rows))
 
@@ -78,14 +88,17 @@ class Question:
 
         # Translate synonym_id to synonym
         for synonym_id in rows:
-            out.append(self.get_value('synonym', synonym_id))
+            out.append(self.get_value("synonym", synonym_id))
 
         return out
 
     def get_mtags(self):
         # Translate response_id into mtag_id
-        self.cur.execute('''SELECT mtag_id FROM responses_to_mtags
-                         WHERE response_id = (?)''', (str(self.response_id), ))
+        self.cur.execute(
+            """SELECT mtag_id FROM responses_to_mtags
+                         WHERE response_id = (?)""",
+            (str(self.response_id),),
+        )
         rows = self.cur.fetchall()
         rows = list(map(lambda x: x[0], rows))
 
@@ -93,21 +106,22 @@ class Question:
 
         # Translate mtag_id to mtag
         for mtag_id in rows:
-            out.append(self.get_value('mtag', mtag_id))
+            out.append(self.get_value("mtag", mtag_id))
 
         return out
 
     def get_placement(self, cue_id, response_id):
-        self.cur.execute('''SELECT placement FROM cues_to_responses
-                         WHERE cue_id = (?) AND response_id = (?)''',
-                         (str(cue_id), str(response_id)))
+        self.cur.execute(
+            """SELECT placement FROM cues_to_responses
+                         WHERE cue_id = (?) AND response_id = (?)""",
+            (str(cue_id), str(response_id)),
+        )
         rows = self.cur.fetchall()
         return rows[0][0]
 
     def get_responses_by_mtag(self, mtag):
         # Translate mtag_id to mtag
-        self.cur.execute('''SELECT mtag_id FROM mtags WHERE mtag = (?)''',
-                         (mtag, ))
+        self.cur.execute("""SELECT mtag_id FROM mtags WHERE mtag = (?)""", (mtag,))
         rows = self.cur.fetchall()
         rows = list(map(lambda x: x[0], rows))
 
@@ -115,8 +129,11 @@ class Question:
         response_ids = []
 
         for mtag_id in rows:
-            self.cur.execute('''SELECT response_id FROM responses_to_mtags
-                             WHERE mtag_id = (?)''', (mtag_id, ))
+            self.cur.execute(
+                """SELECT response_id FROM responses_to_mtags
+                             WHERE mtag_id = (?)""",
+                (mtag_id,),
+            )
             more_rows = self.cur.fetchall()
             response_ids += list(map(lambda x: x[0], more_rows))
 
@@ -124,35 +141,35 @@ class Question:
         out = []
 
         for response_id in response_ids:
-            out.append(self.get_value('response', response_id))
+            out.append(self.get_value("response", response_id))
 
         return out
 
     def is_plural(self, string):
-        '''Detects most plural words in English'''
-        return string[-1:] == 's' or string[-2:] == 'es'
+        """Detects most plural words in English"""
+        return string[-1:] == "s" or string[-2:] == "es"
 
     # Question rendering ######################################################
     def format_cue(self):
-        self.f_cue = self.cue.replace('{{}}', '_' * 9)
+        self.f_cue = self.cue.replace("{{}}", "_" * 9)
 
         if self.placement == 1:
-            self.f_cue = self.f_cue.replace('{{1}}', '___(1)___')
+            self.f_cue = self.f_cue.replace("{{1}}", "___(1)___")
         else:
-            self.f_cue = self.f_cue.replace('{{1}}', '_' * 9)
+            self.f_cue = self.f_cue.replace("{{1}}", "_" * 9)
         if self.placement == 2:
-            self.f_cue = self.f_cue.replace('{{2}}', '___(2)___')
+            self.f_cue = self.f_cue.replace("{{2}}", "___(2)___")
         else:
-            self.f_cue = self.f_cue.replace('{{2}}', '_' * 9)
+            self.f_cue = self.f_cue.replace("{{2}}", "_" * 9)
         if self.placement == 3:
-            self.f_cue = self.f_cue.replace('{{3}}', '___(3)___')
+            self.f_cue = self.f_cue.replace("{{3}}", "___(3)___")
         else:
-            self.f_cue = self.f_cue.replace('{{3}}', '_' * 9)
+            self.f_cue = self.f_cue.replace("{{3}}", "_" * 9)
 
         return self.f_cue
 
     def main_data_loop(self, cue_id, response_id, mtstatistics):
-        '''Main data processing for question rendering'''
+        """Main data processing for question rendering"""
 
         # Initialize core objects
         self.cue_id = cue_id
@@ -169,23 +186,35 @@ class Question:
         self.mtstatistics.update_percentage()
 
         # Determine the level
-        if self.settings.level == '1':
-            self.level_text = 'Level 1'
-        elif self.settings.level == '2':
-            self.level_text = 'Level 2'
-        elif self.settings.level == '3':
-            self.level_text = 'Level 3'
+        if self.settings.level == "1":
+            self.level_text = "Level 1"
+        elif self.settings.level == "2":
+            self.level_text = "Level 2"
+        elif self.settings.level == "3":
+            self.level_text = "Level 3"
 
-        self.stage_text = getattr(self.settings, 'current_stage_label', '')
+        self.stage_text = getattr(self.settings, "current_stage_label", "")
 
         # Important text
-        self.title_text = self.settings.settings['title']
-        self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + ' of ' + str(self.mtstatistics.total)
-        self.correct_so_far_text = str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' · ' + str(round(self.mtstatistics.percentage, 1)) + '%'
+        self.title_text = self.settings.settings["title"]
+        self.response_number_text = (
+            "Response "
+            + str(self.mtstatistics.response_number)
+            + " of "
+            + str(self.mtstatistics.total)
+        )
+        self.correct_so_far_text = (
+            str(self.mtstatistics.number_correct)
+            + "/"
+            + str(self.mtstatistics.response_number - 1)
+            + " · "
+            + str(round(self.mtstatistics.percentage, 1))
+            + "%"
+        )
         self.cue_text = self.format_cue()
 
     def generate_mchoices(self):
-        '''Return the choices for the multiple choice questions'''
+        """Return the choices for the multiple choice questions"""
         out = dict()
 
         # Get responses for all mtags for this response
@@ -197,8 +226,12 @@ class Question:
         # Get responses of the same and the other plurality
         plurality = self.is_plural(self.response)
 
-        same_plurality_responses = list(self.plural_responses) if plurality else list(self.nonplural_responses)
-        other_plurality_responses = list(self.nonplural_responses) if plurality else list(self.plural_responses)
+        same_plurality_responses = (
+            list(self.plural_responses) if plurality else list(self.nonplural_responses)
+        )
+        other_plurality_responses = (
+            list(self.nonplural_responses) if plurality else list(self.plural_responses)
+        )
 
         # We will select first from same_mtag_responses. Then, if
         # that's empty, we'll select from same_plurality_responses. If
@@ -211,8 +244,12 @@ class Question:
         # The response won't be located in other_plurality_responses.
 
         # Filter the pluarlity_responses lists
-        same_plurality_responses = [i for i in same_plurality_responses if i not in same_mtag_responses]
-        other_plurality_responses = [i for i in other_plurality_responses if i not in same_mtag_responses]
+        same_plurality_responses = [
+            i for i in same_plurality_responses if i not in same_mtag_responses
+        ]
+        other_plurality_responses = [
+            i for i in other_plurality_responses if i not in same_mtag_responses
+        ]
 
         # Shuffle the response lists.
         random.shuffle(same_mtag_responses)
@@ -241,7 +278,7 @@ class Question:
                     elif response_pool_consumption_index == 2:
                         response_pool = other_plurality_responses
                     elif response_pool_consumption_index > 2:
-                        raise NoResponsesError('There are no more responses available.')
+                        raise NoResponsesError("There are no more responses available.")
 
                 this_response = response_pool.pop()
             # Capitalize only the first letter of this_response
@@ -252,10 +289,10 @@ class Question:
         return out
 
     def validate_input(self):
-        '''Determine if input is valid'''
+        """Determine if input is valid"""
         self.mtstatistics.is_input_valid = False
 
-        if self.settings.level == '1':
+        if self.settings.level == "1":
             if self.user_input in self.ascii_range:
                 self.mtstatistics.is_input_valid = True
         else:
@@ -263,7 +300,7 @@ class Question:
                 self.mtstatistics.is_input_valid = True
 
     def standardize_string(self, string):
-        '''Standardize strings so they can be compared for correctness'''
+        """Standardize strings so they can be compared for correctness"""
         # The idea here is that a question shouldn't be marked wrong just
         # because the user forgot to enter a hyphen or a space or used the
         # wrong case.
@@ -271,22 +308,22 @@ class Question:
         # Standarization involves the removal of all case, whitespace, and
         # hyphens. This means the grading of questions is not case, whitespace,
         # or hyphen sensitive.
-        
+
         # Remove case (transform to lowercase)
         out = string.lower()
         # Remove whitespace
-        out = ''.join(out.split())
+        out = "".join(out.split())
         # Remove hyphens
-        out = out.replace('-', '')
-        out = out.replace('–', '')
-        out = out.replace('—', '')
+        out = out.replace("-", "")
+        out = out.replace("–", "")
+        out = out.replace("—", "")
 
         return out
 
     def determine_equivalence(self):
-        '''See if input matches a synonym or standarized string'''
+        """See if input matches a synonym or standarized string"""
         self.mtstatistics.is_input_correct = False
-        
+
         # If not, does the input match the response?
         std_input = self.standardize_string(self.user_input)
         std_response = self.standardize_string(self.response)
@@ -304,8 +341,8 @@ class Question:
                     self.mtstatistics.is_input_correct = True
 
     def grade_input(self):
-        '''Determine whether input is correct.'''
-        if self.settings.level == '1':
+        """Determine whether input is correct."""
+        if self.settings.level == "1":
             # For level 1, check to see if the right letter was entered.
             # First, translate the letter to its corresponding choice.
             self.user_input = self.mchoices[self.user_input]
@@ -313,24 +350,23 @@ class Question:
         else:
             # For levels 2 or 3, make sure the right input was entered.
             self.determine_equivalence()
-    
+
     def finalize(self):
-        '''Notify the user of correctness, update statistics, and print'''
+        """Notify the user of correctness, update statistics, and print"""
         if self.mtstatistics.is_input_correct:
             self.mtstatistics.number_correct += 1
             if self.mtstatistics.has_synonym_been_used():
-                self.correctness_str = 'Correct. Default answer: ' + self.response
+                self.correctness_str = "Correct. Default answer: " + self.response
             else:
-                self.correctness_str = 'Correct.'
-                self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+                self.correctness_str = "Correct."
+                self.other_answers_str = "Other correct responses: " + ", ".join(self.synonyms)
         else:
             self.mtstatistics.number_incorrect += 1
             self.mtstatistics.incorrect_responses.append(self.response)
-            self.correctness_str = 'Incorrect. Answer: ' + self.response
-            self.other_answers_str = 'Other correct responses: ' + ', '.join(self.synonyms)
+            self.correctness_str = "Incorrect. Answer: " + self.response
+            self.other_answers_str = "Other correct responses: " + ", ".join(self.synonyms)
 
         self.mtstatistics.response_number += 1
 
         # Reset
-        self.mtstatistics.used_synonym = ''
-    
+        self.mtstatistics.used_synonym = ""

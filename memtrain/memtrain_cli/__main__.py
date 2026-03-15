@@ -1,15 +1,15 @@
 import argparse
-import time
-import textwrap
 import os
-
+import textwrap
+import time
 from datetime import timedelta
 from statistics import mean
 
 from memtrain.memtrain_common.engine import Engine
 from memtrain.memtrain_common.question import Question
 
-class MemtrainCLI():
+
+class MemtrainCLI:
     def __init__(self, argv=None):
         # Initalize core objects
         self.engine = None
@@ -35,30 +35,32 @@ class MemtrainCLI():
 
         # Inter-area margin
         # The character that's printed between CLI interface areas
-        self.iam = ' '
+        self.iam = " "
 
         #######################################################################
         # Argument parsing with argparse
 
         # Create the top-level argument parser
         parser = argparse.ArgumentParser(
-            description='A program for better memory training',
-            prog='memtrain')
+            description="A program for better memory training", prog="memtrain"
+        )
         parser.set_defaults(func=self.train)
 
         # Create arguments
-        parser.add_argument('-t', '--tags', help='Train these tags only')
-        parser.add_argument('-x', '--not-tags', help='Do not train these tags')
-        parser.add_argument('-l', '--level', help='Specify which level to study')
-        parser.add_argument('-n', '--nquestions', type=int, help='Set the number of questions for this session')
-        parser.add_argument('csvfile', help='The CSV file to load')
+        parser.add_argument("-t", "--tags", help="Train these tags only")
+        parser.add_argument("-x", "--not-tags", help="Do not train these tags")
+        parser.add_argument("-l", "--level", help="Specify which level to study")
+        parser.add_argument(
+            "-n", "--nquestions", type=int, help="Set the number of questions for this session"
+        )
+        parser.add_argument("csvfile", help="The CSV file to load")
 
         # Parse arguments
         self.args = parser.parse_args(argv)
         self.args.func(self.args)
 
     def train(self, args):
-        '''Main wrapper for the CLI'''
+        """Main wrapper for the CLI"""
         # Initialize core objects
         self.csvfile = self.args.csvfile
         self.level = self.args.level
@@ -88,34 +90,51 @@ class MemtrainCLI():
 
         self.header_text()
         print()
-        print('Training session complete.')
+        print("Training session complete.")
         print()
-        print('Correct: ' + str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.total) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)')
-        print('Average response time: ' + str(timedelta(seconds=mean(self.mtstatistics.times))))
+        print(
+            "Correct: "
+            + str(self.mtstatistics.number_correct)
+            + "/"
+            + str(self.mtstatistics.total)
+            + " ("
+            + str(round(self.mtstatistics.percentage, 1))
+            + "%)"
+        )
+        print("Average response time: " + str(timedelta(seconds=mean(self.mtstatistics.times))))
         print()
-        if(self.mtstatistics.number_incorrect > 0):
-            print('Responses for which answers were incorrect:')
+        if self.mtstatistics.number_incorrect > 0:
+            print("Responses for which answers were incorrect:")
             print()
             print(self.mtstatistics.formatted_incorrect_responses())
             print()
 
     def header_text(self):
-        '''Printer header text'''
+        """Printer header text"""
         # Print the first row - version and level
-        print(('memtrain ' + self.settings.version).ljust(69) + self.iam + self.question.level_text.rjust(10))
+        print(
+            ("memtrain " + self.settings.version).ljust(69)
+            + self.iam
+            + self.question.level_text.rjust(10)
+        )
         print()
 
         if self.mtstatistics.is_last_question():
             # Just print the title
-            print(self.settings.settings['title'])
+            print(self.settings.settings["title"])
         else:
             # Print the second row - title and number of responses
-            title = self.settings.settings['title']
-            if self.engine.session_mode == 'adaptive' and self.current_item is not None:
-                title += ' [' + self.current_item.stage_label + ']'
+            title = self.settings.settings["title"]
+            if self.engine.session_mode == "adaptive" and self.current_item is not None:
+                title += " [" + self.current_item.stage_label + "]"
 
             title_block = title.ljust(59)
-            self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
+            self.response_number_text = (
+                "Response "
+                + str(self.mtstatistics.response_number)
+                + "/"
+                + str(self.mtstatistics.total)
+            )
             responses_block = (self.response_number_text).rjust(20)
 
             print(title_block + self.iam + responses_block)
@@ -123,17 +142,28 @@ class MemtrainCLI():
             # Print the third row if we are not on the first response - statistics
             # regarding the number of problems right so far.
             if self.mtstatistics.response_number != 1:
-                label_block = 'Correct so far'.ljust(59)
-                statistics_block = (str(self.mtstatistics.number_correct) + '/' + str(self.mtstatistics.response_number-1) + ' (' + str(round(self.mtstatistics.percentage, 1)) + '%)').rjust(20)
+                label_block = "Correct so far".ljust(59)
+                statistics_block = (
+                    str(self.mtstatistics.number_correct)
+                    + "/"
+                    + str(self.mtstatistics.response_number - 1)
+                    + " ("
+                    + str(round(self.mtstatistics.percentage, 1))
+                    + "%)"
+                ).rjust(20)
                 print(label_block + self.iam + statistics_block)
 
     def render_question(self, cue_id, response_id):
-        '''Render the question'''
-        this_question_id = self.mtstatistics.response_number-1
+        """Render the question"""
+        this_question_id = self.mtstatistics.response_number - 1
         self.current_item = self.engine.current_item(this_question_id)
         self.settings.level = self.current_item.level
         self.settings.current_stage_label = self.current_item.stage_label
-        self.question.main_data_loop(self.cr_id_pairs[this_question_id][0], self.cr_id_pairs[this_question_id][1], self.mtstatistics)
+        self.question.main_data_loop(
+            self.cr_id_pairs[this_question_id][0],
+            self.cr_id_pairs[this_question_id][1],
+            self.mtstatistics,
+        )
 
         if not self.mtstatistics.is_last_question():
             self.cue_id = cue_id
@@ -148,25 +178,26 @@ class MemtrainCLI():
             self.mtstatistics.update_percentage()
 
             # If on Level 1, generate the multiple choice questions.
-            if self.settings.level == '1':
+            if self.settings.level == "1":
                 self.question.mchoices = self.question.generate_mchoices()
 
         self.header_text()
 
         self.f_cue = self.question.format_cue()
         # More cue formatting for the CLI interface
-        self.f_cue = textwrap.fill(self.f_cue, initial_indent=' ' * 6,
-                                   subsequent_indent=' ' * 6, width=80)
+        self.f_cue = textwrap.fill(
+            self.f_cue, initial_indent=" " * 6, subsequent_indent=" " * 6, width=80
+        )
         print()
         print(self.f_cue)
         print()
 
         # For level 1, print multiple choices.
         # For level 2, print hints.
-        if self.settings.level == '1':
+        if self.settings.level == "1":
             self.print_mchoices()
             print()
-        elif self.settings.level == '2':
+        elif self.settings.level == "2":
             self.print_hints()
             print()
 
@@ -183,13 +214,15 @@ class MemtrainCLI():
         self.question.validate_input()
 
         # Clear screen.
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system("cls" if os.name == "nt" else "clear")
 
         # If the input is valid, grade input and finalize
         if self.mtstatistics.is_input_valid:
             self.question.grade_input()
             self.mtstatistics.times.append(elasped_time)
-            self.engine.record_result(self.current_item, self.mtstatistics.is_input_correct, elasped_time)
+            self.engine.record_result(
+                self.current_item, self.mtstatistics.is_input_correct, elasped_time
+            )
             self.question.finalize()
             f_correctness_str = textwrap.fill(self.question.correctness_str, width=80)
             print(f_correctness_str)
@@ -202,36 +235,37 @@ class MemtrainCLI():
         # Otherwise, keep looping until a valid response is entered.
         # See line 82.
         else:
-            print('Please enter a valid response.')
+            print("Please enter a valid response.")
             print()
 
     def print_hints(self):
         for hint in self.hints:
             if hint:
                 # Format hint to match cue.
-                f_hint = textwrap.fill('Hint: ' + hint, subsequent_indent=' ' * 6, width=80)
+                f_hint = textwrap.fill("Hint: " + hint, subsequent_indent=" " * 6, width=80)
                 print(f_hint)
 
     def print_mchoices(self):
-        '''Print the multiple choices for Level 1'''
+        """Print the multiple choices for Level 1"""
         for letter, choice in self.question.mchoices.items():
-            this_line = textwrap.fill(choice,
-                                        initial_indent=letter + ')' + (' ' * 4),
-                                        subsequent_indent=' ' * 6, width=80)
+            this_line = textwrap.fill(
+                choice, initial_indent=letter + ")" + (" " * 4), subsequent_indent=" " * 6, width=80
+            )
             print(this_line)
 
     def prompt_for_response(self):
-        '''Prompt for a response and return user input'''
-        if self.settings.level == '1':
-            self.question.user_input = input('Enter response choice: ')
+        """Prompt for a response and return user input"""
+        if self.settings.level == "1":
+            self.question.user_input = input("Enter response choice: ")
         else:
-            self.question.user_input = input('Enter response: ')
+            self.question.user_input = input("Enter response: ")
 
         self.question.user_input = self.question.user_input.lower()
+
 
 def main(argv=None):
     MemtrainCLI(argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

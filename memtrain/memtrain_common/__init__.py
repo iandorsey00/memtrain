@@ -6,14 +6,14 @@ from memtrain.memtrain_common.settings import SettingError, Settings
 from memtrain.memtrain_common.stats import MtStatistics, SessionStatistics
 
 __all__ = [
-    'CSVError',
-    'Database',
-    'Engine',
-    'MtStatistics',
-    'NoResponsesError',
-    'ProgressStore',
-    'Question',
-    'SessionStatistics',
-    'SettingError',
-    'Settings',
+    "CSVError",
+    "Database",
+    "Engine",
+    "MtStatistics",
+    "NoResponsesError",
+    "ProgressStore",
+    "Question",
+    "SessionStatistics",
+    "SettingError",
+    "Settings",
 ]

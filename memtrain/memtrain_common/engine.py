@@ -2,31 +2,30 @@ import csv
 import hashlib
 import os
 import random
-
 from typing import Any
 
-from memtrain.memtrain_common.settings import Settings, SettingError
 from memtrain.memtrain_common.database import Database
 from memtrain.memtrain_common.models import ProgressRecord, SessionItem
-from memtrain.memtrain_common.stats import SessionStatistics
 from memtrain.memtrain_common.progress_store import ProgressStore
+from memtrain.memtrain_common.settings import SettingError, Settings
+from memtrain.memtrain_common.stats import SessionStatistics
 
 
 class NoResponsesError(Exception):
-    '''Raised when no study items match the selected session criteria.'''
+    """Raised when no study items match the selected session criteria."""
 
 
 class CSVError(Exception):
-    '''Raised when the study-set CSV is missing required structure.'''
+    """Raised when the study-set CSV is missing required structure."""
 
 
 class Engine:
     STAGE_LABELS = {
-        0: 'New',
-        1: 'Reinforcing',
-        2: 'Guided recall',
-        3: 'Free recall',
-        4: 'Mature',
+        0: "New",
+        1: "Reinforcing",
+        2: "Guided recall",
+        3: "Free recall",
+        4: "Mature",
     }
 
     def __init__(self, csvfile, level, nquestions, tags, not_tags):
@@ -43,41 +42,41 @@ class Engine:
         self.study_set_id = self.get_study_set_id()
 
         indices: dict[str, list[Any]] = {
-            'cue': [],
-            'response': [],
-            'synonym': [],
-            'hint': [],
-            'tag': [],
-            'mtag': [],
-            'item_id': [],
+            "cue": [],
+            "response": [],
+            "synonym": [],
+            "hint": [],
+            "tag": [],
+            "mtag": [],
+            "item_id": [],
         }
 
         self.set_csv_settings(self.settings, csv_list)
         self.get_csv_column_indices(indices, csv_list)
         self.csv_column_header_row_number = self.get_csv_column_header_row_number(csv_list)
-        data_list = csv_list[self.csv_column_header_row_number + 1:]
+        data_list = csv_list[self.csv_column_header_row_number + 1 :]
 
         self.database.populate(indices, data_list)
         self.all_items = self.build_item_records(indices, data_list)
 
-        self.session_mode = 'adaptive'
+        self.session_mode = "adaptive"
         self.configure_session_mode()
 
-        if self.session_mode == 'manual':
+        if self.session_mode == "manual":
             self.settings.level = self.level
         else:
-            self.settings.level = '1'
+            self.settings.level = "1"
 
         self.settings.session_mode = self.session_mode
 
         if self.nquestions:
             try:
                 if int(self.nquestions) < 0:
-                    raise SettingError('Invalid number of questions specified.')
+                    raise SettingError("Invalid number of questions specified.")
                 else:
-                    self.settings.settings['nquestions'] = int(self.nquestions)
+                    self.settings.settings["nquestions"] = int(self.nquestions)
             except ValueError:
-                raise SettingError('Supplied nquestions is not an int.')
+                raise SettingError("Supplied nquestions is not an int.")
 
         self.filtered_items = self.filter_items(list(self.all_items))
         self.session_items = self.build_session_items(self.filtered_items)
@@ -87,43 +86,43 @@ class Engine:
         self.mtstatistics.total = len(self.session_items)
 
         if self.mtstatistics.total == 0:
-            raise NoResponsesError('There are no responses available that match the criteria.')
+            raise NoResponsesError("There are no responses available that match the criteria.")
 
     def configure_session_mode(self):
         if not self.level:
             return
 
         enabled_levels = {
-            '1': self.settings.settings['level1'],
-            '2': self.settings.settings['level2'],
-            '3': self.settings.settings['level3'],
+            "1": self.settings.settings["level1"],
+            "2": self.settings.settings["level2"],
+            "3": self.settings.settings["level3"],
         }
 
         if self.level not in enabled_levels:
-            raise SettingError('Invalid level specified.')
+            raise SettingError("Invalid level specified.")
 
         if not enabled_levels[self.level]:
-            raise SettingError(f'Level {self.level} functionality has been disabled for this CSV.')
+            raise SettingError(f"Level {self.level} functionality has been disabled for this CSV.")
 
-        self.session_mode = 'manual'
+        self.session_mode = "manual"
 
     def get_study_set_id(self) -> str:
         normalized = os.path.abspath(self.csvfile)
-        return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
+        return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
 
     def build_item_id(self, cue: str, response: str) -> str:
-        normalized = '{}::{}'.format(cue.strip(), response.strip())
-        return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
+        normalized = "{}::{}".format(cue.strip(), response.strip())
+        return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
 
     def level_for_stage(self, stage: int) -> str:
         if stage <= 1:
-            return '1'
+            return "1"
         if stage == 2:
-            return '2'
-        return '3'
+            return "2"
+        return "3"
 
     def stage_label(self, stage: int) -> str:
-        return self.STAGE_LABELS.get(stage, 'Unknown')
+        return self.STAGE_LABELS.get(stage, "Unknown")
 
     def merge_progress(
         self,
@@ -151,17 +150,17 @@ class Engine:
         out: list[SessionItem] = []
 
         for data_row in data_list:
-            cue = data_row[indices['cue'][0]]
+            cue = data_row[indices["cue"][0]]
 
-            for placement, response_index in enumerate(indices['response']):
+            for placement, response_index in enumerate(indices["response"]):
                 response = data_row[response_index]
 
                 if not response:
                     continue
 
-                explicit_item_id = ''
-                if placement < len(indices['item_id']) and indices['item_id'][placement]:
-                    explicit_item_id = data_row[indices['item_id'][placement][0]]
+                explicit_item_id = ""
+                if placement < len(indices["item_id"]) and indices["item_id"][placement]:
+                    explicit_item_id = data_row[indices["item_id"][placement][0]]
 
                 item = SessionItem(
                     item_id=explicit_item_id or self.build_item_id(cue, response),
@@ -177,7 +176,7 @@ class Engine:
 
     def get_all_response_ids_for_tags(self, tags):
         these_response_ids = []
-        args_tags = tags.split(',')
+        args_tags = tags.split(",")
 
         for tag in args_tags:
             tag = tag.strip()
@@ -218,7 +217,7 @@ class Engine:
         ]
         random.shuffle(session_items)
 
-        nquestions = self.settings.settings['nquestions']
+        nquestions = self.settings.settings["nquestions"]
 
         if nquestions != 0:
             if nquestions > len(session_items) and len(session_items) > 0:
@@ -264,7 +263,7 @@ class Engine:
                 item.next_due_at or self.progress_store.now(),
                 item.progress.mastery_score,
                 -item.progress.failure_count,
-            )
+            ),
         )
 
     def sort_weak_items(self, items: list[SessionItem]) -> list[SessionItem]:
@@ -274,11 +273,11 @@ class Engine:
                 item.progress.mastery_score,
                 -item.progress.failure_count,
                 item.progress.reviews,
-            )
+            ),
         )
 
     def adaptive_session_size(self, total_items: int) -> int:
-        nquestions = self.settings.settings['nquestions']
+        nquestions = self.settings.settings["nquestions"]
 
         if nquestions:
             return min(nquestions, total_items)
@@ -323,7 +322,9 @@ class Engine:
             for item in items
         ]
         due_items = self.sort_due_items([item for item in annotated if item.is_due])
-        weak_items = self.sort_weak_items([item for item in annotated if item.is_weak and not item.is_due])
+        weak_items = self.sort_weak_items(
+            [item for item in annotated if item.is_weak and not item.is_due]
+        )
         new_items = [item for item in annotated if item.is_new]
         random.shuffle(new_items)
 
@@ -339,7 +340,9 @@ class Engine:
         session_items += self.take_items(new_items, new_target, selected_ids)
 
         remainder_pool = due_items + weak_items + new_items + annotated
-        session_items += self.take_items(remainder_pool, session_size - len(session_items), selected_ids)
+        session_items += self.take_items(
+            remainder_pool, session_size - len(session_items), selected_ids
+        )
         random.shuffle(session_items)
 
         for item in session_items:
@@ -351,7 +354,7 @@ class Engine:
         item_ids = [item.item_id for item in items]
         progress_map = self.progress_store.get_progress_map(self.study_set_id, item_ids)
 
-        if self.session_mode == 'manual':
+        if self.session_mode == "manual":
             return self.build_manual_session_items(items, progress_map)
 
         return self.build_adaptive_session_items(items, progress_map)
@@ -367,8 +370,8 @@ class Engine:
         previous_avg = progress.average_response_time
         previous_reviews = progress.reviews - 1
         progress.average_response_time = (
-            (previous_avg * previous_reviews + elapsed_time) / progress.reviews
-        )
+            previous_avg * previous_reviews + elapsed_time
+        ) / progress.reviews
 
         stage = progress.current_stage
         mastery = progress.mastery_score
@@ -397,20 +400,20 @@ class Engine:
 
         item.progress = progress
         item.current_stage = stage
-        item.level = self.level if self.session_mode == 'manual' else self.level_for_stage(stage)
+        item.level = self.level if self.session_mode == "manual" else self.level_for_stage(stage)
         item.stage_label = self.stage_label(stage)
 
         self.progress_store.update_progress(self.study_set_id, item.item_id, progress)
 
     def normalize_row(self, row):
-        '''Make every string in a row lowercase and remove all whitespace'''
-        return [''.join(value.lower().split()) for value in row]
+        """Make every string in a row lowercase and remove all whitespace"""
+        return ["".join(value.lower().split()) for value in row]
 
     def load(self, csvfile):
-        '''Load the CSV file'''
+        """Load the CSV file"""
         out = []
 
-        with open(csvfile, encoding='utf-8') as cf:
+        with open(csvfile, encoding="utf-8") as cf:
             csvreader = csv.reader(cf)
             for row in csvreader:
                 out.append(row)
@@ -418,37 +421,37 @@ class Engine:
         return out
 
     def get_indices(self, row, target_str):
-        '''Get all indices for target_str in a row'''
+        """Get all indices for target_str in a row"""
         return [index for index, element in enumerate(row) if element == target_str]
 
     def get_index(self, row, target_str):
-        '''Get the first index for target_str in a row.'''
+        """Get the first index for target_str in a row."""
         return self.get_indices(row, target_str)[:1]
 
     def get_index_mandatory(self, row, target_str):
-        '''
+        """
         Get a mandatory index for target_str in a row. It is an error if it doesn't
         exist.
-        '''
+        """
         index = self.get_index(row, target_str)
 
         if len(index) < 1:
-            raise CSVError(f'The mandatory column {target_str} is missing.')
-        
+            raise CSVError(f"The mandatory column {target_str} is missing.")
+
         return index
 
     def is_header_row(self, row):
-        '''Determine whether the curent row is the header row'''
-        return 'cue' in row and 'response' in row
+        """Determine whether the curent row is the header row"""
+        return "cue" in row and "response" in row
 
     def set_csv_settings(self, settings, csv_list):
-        '''Set CSV settings'''
+        """Set CSV settings"""
         for row in csv_list:
             non_empty = [item for item in row if len(item) > 0]
 
             if len(non_empty) == 1:
                 settings_str = self.normalize_row(row)[0]
-                if settings_str.startswith('settings:'):
+                if settings_str.startswith("settings:"):
                     settings.load_settings(settings_str)
                 else:
                     settings.set_title(row)
@@ -457,37 +460,37 @@ class Engine:
                 break
 
     def get_csv_column_indices(self, indices, csv_list):
-        '''Get column indices for database processing'''
+        """Get column indices for database processing"""
         for row in csv_list:
             this_row = self.normalize_row(row)
             if self.is_header_row(this_row):
-                indices['cue'] = self.get_index_mandatory(this_row, 'cue')
+                indices["cue"] = self.get_index_mandatory(this_row, "cue")
 
-                indices['response'] = self.get_index_mandatory(this_row, 'response')
-                indices['response'] += self.get_index(this_row, 'response2')
-                indices['response'] += self.get_index(this_row, 'response3')
+                indices["response"] = self.get_index_mandatory(this_row, "response")
+                indices["response"] += self.get_index(this_row, "response2")
+                indices["response"] += self.get_index(this_row, "response3")
 
-                indices['synonym'] = [self.get_indices(this_row, 'synonym')]
-                indices['synonym'].append(self.get_indices(this_row, 'synonym2'))
-                indices['synonym'].append(self.get_indices(this_row, 'synonym3'))
+                indices["synonym"] = [self.get_indices(this_row, "synonym")]
+                indices["synonym"].append(self.get_indices(this_row, "synonym2"))
+                indices["synonym"].append(self.get_indices(this_row, "synonym3"))
 
-                indices['hint'] = [self.get_indices(this_row, 'hint')]
-                indices['hint'].append(self.get_indices(this_row, 'hint2'))
-                indices['hint'].append(self.get_indices(this_row, 'hint3'))
+                indices["hint"] = [self.get_indices(this_row, "hint")]
+                indices["hint"].append(self.get_indices(this_row, "hint2"))
+                indices["hint"].append(self.get_indices(this_row, "hint3"))
 
-                indices['tag'] = self.get_indices(this_row, 'tag')
-                indices['mtag'] = self.get_indices(this_row, 'mtag')
-                indices['item_id'] = [self.get_indices(this_row, 'id')]
-                indices['item_id'].append(self.get_indices(this_row, 'id2'))
-                indices['item_id'].append(self.get_indices(this_row, 'id3'))
+                indices["tag"] = self.get_indices(this_row, "tag")
+                indices["mtag"] = self.get_indices(this_row, "mtag")
+                indices["item_id"] = [self.get_indices(this_row, "id")]
+                indices["item_id"].append(self.get_indices(this_row, "id2"))
+                indices["item_id"].append(self.get_indices(this_row, "id3"))
 
                 break
 
     def get_csv_column_header_row_number(self, csv_list):
-        '''Get the CSV column header row number'''
+        """Get the CSV column header row number"""
         for row_number, row in enumerate(csv_list):
             this_row = self.normalize_row(row)
             if self.is_header_row(this_row):
                 return row_number
 
-        raise CSVError('No header row')
+        raise CSVError("No header row")

@@ -1,13 +1,12 @@
 import os
 import sqlite3
-
 from datetime import datetime, timedelta, timezone
 
 from memtrain.memtrain_common.models import ProgressRecord
 
 
 class ProgressStore:
-    '''Persist per-item learner progress for adaptive sessions.'''
+    """Persist per-item learner progress for adaptive sessions."""
 
     def __init__(self, csvfile):
         self.db_path = self.get_db_path(csvfile)
@@ -16,15 +15,16 @@ class ProgressStore:
         self.create_tables()
 
     def get_db_path(self, csvfile):
-        override = os.environ.get('MEMTRAIN_PROGRESS_DB')
+        override = os.environ.get("MEMTRAIN_PROGRESS_DB")
         if override:
             return override
 
-        csv_dir = os.path.dirname(os.path.abspath(csvfile)) or '.'
-        return os.path.join(csv_dir, '.memtrain-progress.sqlite3')
+        csv_dir = os.path.dirname(os.path.abspath(csvfile)) or "."
+        return os.path.join(csv_dir, ".memtrain-progress.sqlite3")
 
     def create_tables(self):
-        self.conn.execute('''CREATE TABLE IF NOT EXISTS item_progress (
+        self.conn.execute(
+            """CREATE TABLE IF NOT EXISTS item_progress (
                           study_set_id TEXT,
                           item_id TEXT,
                           current_stage INTEGER NOT NULL DEFAULT 0,
@@ -36,31 +36,34 @@ class ProgressStore:
                           reviews INTEGER NOT NULL DEFAULT 0,
                           last_seen_at TEXT,
                           next_due_at TEXT,
-                          PRIMARY KEY (study_set_id, item_id))''')
+                          PRIMARY KEY (study_set_id, item_id))"""
+        )
         self.conn.commit()
 
     def get_progress_map(self, study_set_id, item_ids):
         if not item_ids:
             return {}
 
-        placeholders = ','.join('?' for _ in item_ids)
+        placeholders = ",".join("?" for _ in item_ids)
         params = [study_set_id] + list(item_ids)
-        query = '''SELECT * FROM item_progress
+        query = """SELECT * FROM item_progress
                    WHERE study_set_id = ?
-                   AND item_id IN ({})'''.format(placeholders)
+                   AND item_id IN ({})""".format(
+            placeholders
+        )
 
         rows = self.conn.execute(query, params).fetchall()
         out = {}
 
         for row in rows:
-            out[row['item_id']] = ProgressRecord.from_mapping(dict(row))
+            out[row["item_id"]] = ProgressRecord.from_mapping(dict(row))
 
         return out
 
     def update_progress(self, study_set_id, item_id, progress):
         progress_values = progress.to_mapping()
         self.conn.execute(
-            '''INSERT INTO item_progress(
+            """INSERT INTO item_progress(
                    study_set_id, item_id, current_stage, mastery_score,
                    success_streak, failure_count, lapse_count,
                    average_response_time, reviews, last_seen_at, next_due_at)
@@ -74,20 +77,20 @@ class ProgressStore:
                    average_response_time = excluded.average_response_time,
                    reviews = excluded.reviews,
                    last_seen_at = excluded.last_seen_at,
-                   next_due_at = excluded.next_due_at''',
+                   next_due_at = excluded.next_due_at""",
             (
                 study_set_id,
                 item_id,
-                progress_values['current_stage'],
-                progress_values['mastery_score'],
-                progress_values['success_streak'],
-                progress_values['failure_count'],
-                progress_values['lapse_count'],
-                progress_values['average_response_time'],
-                progress_values['reviews'],
-                progress_values['last_seen_at'],
-                progress_values['next_due_at'],
-            )
+                progress_values["current_stage"],
+                progress_values["mastery_score"],
+                progress_values["success_streak"],
+                progress_values["failure_count"],
+                progress_values["lapse_count"],
+                progress_values["average_response_time"],
+                progress_values["reviews"],
+                progress_values["last_seen_at"],
+                progress_values["next_due_at"],
+            ),
         )
         self.conn.commit()
 
