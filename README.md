@@ -67,4 +67,4 @@ On newer macOS releases, the Apple Command Line Tools `python3` may be linked to
 
 ## Documentation direction
 
-The repository docs in `/docs` are now intended to be the canonical documentation for the project. The old wiki can be retired once any remaining useful content has been folded into these pages.
+The repository docs in `/docs` are the canonical documentation for the project. The old wiki has been superseded by these pages.
