@@ -3,6 +3,8 @@ import sqlite3
 
 from datetime import datetime, timedelta, timezone
 
+from memtrain.memtrain_common.models import ProgressRecord
+
 
 class ProgressStore:
     '''Persist per-item learner progress for adaptive sessions.'''
@@ -51,11 +53,12 @@ class ProgressStore:
         out = {}
 
         for row in rows:
-            out[row['item_id']] = dict(row)
+            out[row['item_id']] = ProgressRecord.from_mapping(dict(row))
 
         return out
 
     def update_progress(self, study_set_id, item_id, progress):
+        progress_values = progress.to_mapping()
         self.conn.execute(
             '''INSERT INTO item_progress(
                    study_set_id, item_id, current_stage, mastery_score,
@@ -75,15 +78,15 @@ class ProgressStore:
             (
                 study_set_id,
                 item_id,
-                progress['current_stage'],
-                progress['mastery_score'],
-                progress['success_streak'],
-                progress['failure_count'],
-                progress['lapse_count'],
-                progress['average_response_time'],
-                progress['reviews'],
-                progress['last_seen_at'],
-                progress['next_due_at'],
+                progress_values['current_stage'],
+                progress_values['mastery_score'],
+                progress_values['success_streak'],
+                progress_values['failure_count'],
+                progress_values['lapse_count'],
+                progress_values['average_response_time'],
+                progress_values['reviews'],
+                progress_values['last_seen_at'],
+                progress_values['next_due_at'],
             )
         )
         self.conn.commit()

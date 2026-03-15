@@ -112,7 +112,7 @@ class MemtrainCLI():
             # Print the second row - title and number of responses
             title = self.settings.settings['title']
             if self.engine.session_mode == 'adaptive' and self.current_item is not None:
-                title += ' [' + self.current_item['stage_label'] + ']'
+                title += ' [' + self.current_item.stage_label + ']'
 
             title_block = title.ljust(59)
             self.response_number_text = 'Response ' + str(self.mtstatistics.response_number) + '/' + str(self.mtstatistics.total)
@@ -131,8 +131,8 @@ class MemtrainCLI():
         '''Render the question'''
         this_question_id = self.mtstatistics.response_number-1
         self.current_item = self.engine.current_item(this_question_id)
-        self.settings.level = self.current_item['level']
-        self.settings.current_stage_label = self.current_item['stage_label']
+        self.settings.level = self.current_item.level
+        self.settings.current_stage_label = self.current_item.stage_label
         self.question.main_data_loop(self.cr_id_pairs[this_question_id][0], self.cr_id_pairs[this_question_id][1], self.mtstatistics)
 
         if not self.mtstatistics.is_last_question():

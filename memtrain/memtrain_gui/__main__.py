@@ -18,7 +18,7 @@ class MemtrainGUI:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title('memtrain v0.4.1')
+        self.root.title('memtrain v0.4.2')
         self.root.minsize(720, 420)
 
         self.filename = ''
@@ -434,8 +434,8 @@ class MemtrainGUI:
         question_index = self.mtstatistics.response_number - 1
 
         self.current_item = self.engine.current_item(question_index)
-        self.settings.level = self.current_item['level']
-        self.settings.current_stage_label = self.current_item['stage_label']
+        self.settings.level = self.current_item.level
+        self.settings.current_stage_label = self.current_item.stage_label
         self.question.main_data_loop(
             self.cr_id_pairs[question_index][0],
             self.cr_id_pairs[question_index][1],
@@ -444,7 +444,7 @@ class MemtrainGUI:
 
         title_text = self.question.title_text
         if self.engine.session_mode == 'adaptive':
-            title_text += ' [' + self.current_item['stage_label'] + ']'
+            title_text += ' [' + self.current_item.stage_label + ']'
 
         self.title_label.configure(text=title_text)
         self.level_label.configure(text=self.question.level_text)

@@ -4,8 +4,6 @@ memtrain is a lightweight study tool for structured recall practice.
 
 It is designed for small-to-medium study sets where prompt wording matters: fill-in-the-blank cues, accepted synonyms, hints, tags, and staged recall from multiple choice to free response. Instead of trying to be a full flashcard ecosystem, memtrain focuses on authored prompts and simple adaptive review.
 
-![memtrain screenshot](https://raw.githubusercontent.com/iandorsey00/memtrain/master/docs/img/memtrain-screenshot.png "memtrain screenshot")
-
 ## What memtrain is for
 
 - studying terminology, certification material, taxonomies, commands, and other structured factual recall

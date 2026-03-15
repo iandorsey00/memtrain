@@ -1,10 +1,13 @@
 import csv
 import hashlib
-import random
 import os
+import random
+
+from typing import Any
 
 from memtrain.memtrain_common.settings import Settings, SettingError
 from memtrain.memtrain_common.database import Database
+from memtrain.memtrain_common.models import ProgressRecord, SessionItem
 from memtrain.memtrain_common.stats import SessionStatistics
 from memtrain.memtrain_common.progress_store import ProgressStore
 
@@ -15,6 +18,7 @@ class NoResponsesError(Exception):
 
 class CSVError(Exception):
     '''Raised when the study-set CSV is missing required structure.'''
+
 
 class Engine:
     STAGE_LABELS = {
@@ -38,7 +42,7 @@ class Engine:
         self.progress_store = ProgressStore(self.csvfile)
         self.study_set_id = self.get_study_set_id()
 
-        indices = {
+        indices: dict[str, list[Any]] = {
             'cue': [],
             'response': [],
             'synonym': [],
@@ -77,7 +81,7 @@ class Engine:
 
         self.filtered_items = self.filter_items(list(self.all_items))
         self.session_items = self.build_session_items(self.filtered_items)
-        self.cr_id_pairs = [(item['cue_id'], item['response_id']) for item in self.session_items]
+        self.cr_id_pairs = [(item.cue_id, item.response_id) for item in self.session_items]
 
         self.mtstatistics = SessionStatistics()
         self.mtstatistics.total = len(self.session_items)
@@ -103,59 +107,48 @@ class Engine:
 
         self.session_mode = 'manual'
 
-    def get_study_set_id(self):
+    def get_study_set_id(self) -> str:
         normalized = os.path.abspath(self.csvfile)
         return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
 
-    def build_item_id(self, cue, response):
+    def build_item_id(self, cue: str, response: str) -> str:
         normalized = '{}::{}'.format(cue.strip(), response.strip())
         return hashlib.sha1(normalized.encode('utf-8')).hexdigest()
 
-    def level_for_stage(self, stage):
+    def level_for_stage(self, stage: int) -> str:
         if stage <= 1:
             return '1'
         if stage == 2:
             return '2'
         return '3'
 
-    def stage_label(self, stage):
+    def stage_label(self, stage: int) -> str:
         return self.STAGE_LABELS.get(stage, 'Unknown')
 
-    def default_progress(self):
-        return {
-            'current_stage': 0,
-            'mastery_score': 0.0,
-            'success_streak': 0,
-            'failure_count': 0,
-            'lapse_count': 0,
-            'average_response_time': 0.0,
-            'reviews': 0,
-            'last_seen_at': None,
-            'next_due_at': None,
-        }
+    def merge_progress(
+        self,
+        item: SessionItem,
+        progress_map: dict[str, ProgressRecord],
+    ) -> SessionItem:
+        progress = progress_map.get(item.item_id, ProgressRecord())
 
-    def merge_progress(self, item, progress_map):
-        progress = dict(self.default_progress())
-        if item['item_id'] in progress_map:
-            progress.update(progress_map[item['item_id']])
+        item.progress = ProgressRecord.from_mapping(progress.to_mapping())
+        item.current_stage = item.progress.current_stage
+        item.level = self.level_for_stage(item.current_stage)
+        item.stage_label = self.stage_label(item.current_stage)
+        item.is_new = item.progress.last_seen_at is None
 
-        item['progress'] = progress
-        item['current_stage'] = int(progress['current_stage'])
-        item['level'] = self.level_for_stage(item['current_stage'])
-        item['stage_label'] = self.stage_label(item['current_stage'])
-        item['is_new'] = progress['last_seen_at'] is None
-
-        next_due_at = self.progress_store.parse_datetime(progress['next_due_at'])
-        item['next_due_at'] = next_due_at
-        item['is_due'] = progress['last_seen_at'] is not None and (
+        next_due_at = self.progress_store.parse_datetime(item.progress.next_due_at)
+        item.next_due_at = next_due_at
+        item.is_due = item.progress.last_seen_at is not None and (
             next_due_at is None or next_due_at <= self.progress_store.now()
         )
-        item['is_weak'] = progress['failure_count'] > 0 or progress['mastery_score'] < 0.4
+        item.is_weak = item.progress.failure_count > 0 or item.progress.mastery_score < 0.4
 
         return item
 
-    def build_item_records(self, indices, data_list):
-        out = []
+    def build_item_records(self, indices, data_list) -> list[SessionItem]:
+        out: list[SessionItem] = []
 
         for data_row in data_list:
             cue = data_row[indices['cue'][0]]
@@ -170,14 +163,14 @@ class Engine:
                 if placement < len(indices['item_id']) and indices['item_id'][placement]:
                     explicit_item_id = data_row[indices['item_id'][placement][0]]
 
-                item = {
-                    'item_id': explicit_item_id or self.build_item_id(cue, response),
-                    'cue': cue,
-                    'response': response,
-                    'cue_id': self.database.get_cue_id(cue),
-                    'response_id': self.database.get_response_id(response),
-                    'placement': placement + 1,
-                }
+                item = SessionItem(
+                    item_id=explicit_item_id or self.build_item_id(cue, response),
+                    cue=cue,
+                    response=response,
+                    cue_id=self.database.get_cue_id(cue),
+                    response_id=self.database.get_response_id(response),
+                    placement=placement + 1,
+                )
                 out.append(item)
 
         return out
@@ -193,19 +186,36 @@ class Engine:
 
         return list(set(these_response_ids))
 
-    def filter_items(self, items):
+    def filter_items(self, items: list[SessionItem]) -> list[SessionItem]:
         if self.tags:
             these_response_ids = self.get_all_response_ids_for_tags(self.tags)
-            items = [item for item in items if item['response_id'] in these_response_ids]
+            items = [item for item in items if item.response_id in these_response_ids]
 
         if self.not_tags:
             these_response_ids = self.get_all_response_ids_for_tags(self.not_tags)
-            items = [item for item in items if item['response_id'] not in these_response_ids]
+            items = [item for item in items if item.response_id not in these_response_ids]
 
         return items
 
-    def build_manual_session_items(self, items, progress_map):
-        session_items = [self.merge_progress(dict(item), progress_map) for item in items]
+    def build_manual_session_items(
+        self,
+        items: list[SessionItem],
+        progress_map: dict[str, ProgressRecord],
+    ) -> list[SessionItem]:
+        session_items = [
+            self.merge_progress(
+                SessionItem(
+                    item_id=item.item_id,
+                    cue=item.cue,
+                    response=item.response,
+                    cue_id=item.cue_id,
+                    response_id=item.response_id,
+                    placement=item.placement,
+                ),
+                progress_map,
+            )
+            for item in items
+        ]
         random.shuffle(session_items)
 
         nquestions = self.settings.settings['nquestions']
@@ -216,39 +226,58 @@ class Engine:
                 duplicates = list(session_items)
 
                 for i in range(add):
-                    duplicates.append(dict(random.choice(session_items)))
+                    item = random.choice(session_items)
+                    duplicates.append(
+                        SessionItem(
+                            item_id=item.item_id,
+                            cue=item.cue,
+                            response=item.response,
+                            cue_id=item.cue_id,
+                            response_id=item.response_id,
+                            placement=item.placement,
+                            progress=ProgressRecord.from_mapping(item.progress.to_mapping()),
+                            current_stage=item.current_stage,
+                            level=item.level,
+                            stage_label=item.stage_label,
+                            is_new=item.is_new,
+                            next_due_at=item.next_due_at,
+                            is_due=item.is_due,
+                            is_weak=item.is_weak,
+                            session_stage=item.session_stage,
+                        )
+                    )
 
                 session_items = duplicates
             else:
                 session_items = session_items[:nquestions]
 
         for item in session_items:
-            item['level'] = self.level
-            item['session_stage'] = item['current_stage']
+            item.level = self.level
+            item.session_stage = item.current_stage
 
         return session_items
 
-    def sort_due_items(self, items):
+    def sort_due_items(self, items: list[SessionItem]) -> list[SessionItem]:
         return sorted(
             items,
             key=lambda item: (
-                item['next_due_at'] or self.progress_store.now(),
-                item['progress']['mastery_score'],
-                -item['progress']['failure_count'],
+                item.next_due_at or self.progress_store.now(),
+                item.progress.mastery_score,
+                -item.progress.failure_count,
             )
         )
 
-    def sort_weak_items(self, items):
+    def sort_weak_items(self, items: list[SessionItem]) -> list[SessionItem]:
         return sorted(
             items,
             key=lambda item: (
-                item['progress']['mastery_score'],
-                -item['progress']['failure_count'],
-                item['progress']['reviews'],
+                item.progress.mastery_score,
+                -item.progress.failure_count,
+                item.progress.reviews,
             )
         )
 
-    def adaptive_session_size(self, total_items):
+    def adaptive_session_size(self, total_items: int) -> int:
         nquestions = self.settings.settings['nquestions']
 
         if nquestions:
@@ -256,24 +285,46 @@ class Engine:
 
         return min(20, total_items)
 
-    def take_items(self, pool, amount, selected_ids):
-        out = []
+    def take_items(
+        self,
+        pool: list[SessionItem],
+        amount: int,
+        selected_ids: set[str],
+    ) -> list[SessionItem]:
+        out: list[SessionItem] = []
 
         for item in pool:
             if len(out) >= amount:
                 break
-            if item['item_id'] in selected_ids:
+            if item.item_id in selected_ids:
                 continue
             out.append(item)
-            selected_ids.add(item['item_id'])
+            selected_ids.add(item.item_id)
 
         return out
 
-    def build_adaptive_session_items(self, items, progress_map):
-        annotated = [self.merge_progress(dict(item), progress_map) for item in items]
-        due_items = self.sort_due_items([item for item in annotated if item['is_due']])
-        weak_items = self.sort_weak_items([item for item in annotated if item['is_weak'] and not item['is_due']])
-        new_items = [item for item in annotated if item['is_new']]
+    def build_adaptive_session_items(
+        self,
+        items: list[SessionItem],
+        progress_map: dict[str, ProgressRecord],
+    ) -> list[SessionItem]:
+        annotated = [
+            self.merge_progress(
+                SessionItem(
+                    item_id=item.item_id,
+                    cue=item.cue,
+                    response=item.response,
+                    cue_id=item.cue_id,
+                    response_id=item.response_id,
+                    placement=item.placement,
+                ),
+                progress_map,
+            )
+            for item in items
+        ]
+        due_items = self.sort_due_items([item for item in annotated if item.is_due])
+        weak_items = self.sort_weak_items([item for item in annotated if item.is_weak and not item.is_due])
+        new_items = [item for item in annotated if item.is_new]
         random.shuffle(new_items)
 
         session_size = self.adaptive_session_size(len(annotated))
@@ -292,12 +343,12 @@ class Engine:
         random.shuffle(session_items)
 
         for item in session_items:
-            item['session_stage'] = item['current_stage']
+            item.session_stage = item.current_stage
 
         return session_items
 
-    def build_session_items(self, items):
-        item_ids = [item['item_id'] for item in items]
+    def build_session_items(self, items: list[SessionItem]) -> list[SessionItem]:
+        item_ids = [item.item_id for item in items]
         progress_map = self.progress_store.get_progress_map(self.study_set_id, item_ids)
 
         if self.session_mode == 'manual':
@@ -305,51 +356,51 @@ class Engine:
 
         return self.build_adaptive_session_items(items, progress_map)
 
-    def current_item(self, question_index):
+    def current_item(self, question_index: int) -> SessionItem:
         return self.session_items[question_index]
 
-    def record_result(self, item, is_correct, elapsed_time):
-        progress = dict(item['progress'])
-        progress['reviews'] = int(progress['reviews']) + 1
-        progress['last_seen_at'] = self.progress_store.to_iso(self.progress_store.now())
+    def record_result(self, item: SessionItem, is_correct: bool, elapsed_time: float) -> None:
+        progress = ProgressRecord.from_mapping(item.progress.to_mapping())
+        progress.reviews += 1
+        progress.last_seen_at = self.progress_store.to_iso(self.progress_store.now())
 
-        previous_avg = float(progress['average_response_time'])
-        previous_reviews = progress['reviews'] - 1
-        progress['average_response_time'] = (
-            (previous_avg * previous_reviews + elapsed_time) / progress['reviews']
+        previous_avg = progress.average_response_time
+        previous_reviews = progress.reviews - 1
+        progress.average_response_time = (
+            (previous_avg * previous_reviews + elapsed_time) / progress.reviews
         )
 
-        stage = int(progress['current_stage'])
-        mastery = float(progress['mastery_score'])
-        streak = int(progress['success_streak'])
+        stage = progress.current_stage
+        mastery = progress.mastery_score
+        streak = progress.success_streak
 
         if is_correct:
             streak += 1
-            progress['success_streak'] = streak
-            progress['failure_count'] = max(0, int(progress['failure_count']) - 1)
+            progress.success_streak = streak
+            progress.failure_count = max(0, progress.failure_count - 1)
             mastery = min(1.0, mastery + 0.2)
             required_streak = 2 if stage < 3 else 3
 
             if streak >= required_streak and stage < 4:
                 stage += 1
-                progress['success_streak'] = 0
+                progress.success_streak = 0
         else:
             stage = max(0, stage - 1)
-            progress['success_streak'] = 0
-            progress['failure_count'] = int(progress['failure_count']) + 1
-            progress['lapse_count'] = int(progress['lapse_count']) + 1
+            progress.success_streak = 0
+            progress.failure_count += 1
+            progress.lapse_count += 1
             mastery = max(0.0, mastery - 0.25)
 
-        progress['current_stage'] = stage
-        progress['mastery_score'] = mastery
-        progress['next_due_at'] = self.progress_store.next_due(stage, is_correct)
+        progress.current_stage = stage
+        progress.mastery_score = mastery
+        progress.next_due_at = self.progress_store.next_due(stage, is_correct)
 
-        item['progress'] = progress
-        item['current_stage'] = stage
-        item['level'] = self.level if self.session_mode == 'manual' else self.level_for_stage(stage)
-        item['stage_label'] = self.stage_label(stage)
+        item.progress = progress
+        item.current_stage = stage
+        item.level = self.level if self.session_mode == 'manual' else self.level_for_stage(stage)
+        item.stage_label = self.stage_label(stage)
 
-        self.progress_store.update_progress(self.study_set_id, item['item_id'], progress)
+        self.progress_store.update_progress(self.study_set_id, item.item_id, progress)
 
     def normalize_row(self, row):
         '''Make every string in a row lowercase and remove all whitespace'''

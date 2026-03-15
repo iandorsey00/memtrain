@@ -37,7 +37,7 @@ class EngineTestCase(unittest.TestCase):
 
         self.assertEqual(engine.session_mode, 'manual')
         self.assertEqual(engine.settings.level, '2')
-        self.assertTrue(all(item['level'] == '2' for item in engine.session_items))
+        self.assertTrue(all(item.level == '2' for item in engine.session_items))
 
     def test_adaptive_session_filters_by_tag(self):
         csv_path = self.write_csv(
@@ -55,7 +55,7 @@ class EngineTestCase(unittest.TestCase):
         engine = Engine(str(csv_path), None, 10, 'Felidae', None)
 
         self.assertEqual(engine.session_mode, 'adaptive')
-        self.assertEqual(sorted(item['response'] for item in engine.session_items), ['Cats', 'Lion'])
+        self.assertEqual(sorted(item.response for item in engine.session_items), ['Cats', 'Lion'])
 
     def test_explicit_item_ids_are_used_when_present(self):
         csv_path = self.write_csv(
@@ -71,7 +71,7 @@ class EngineTestCase(unittest.TestCase):
         engine = Engine(str(csv_path), None, None, None, None)
 
         self.assertEqual(
-            sorted(item['item_id'] for item in engine.session_items),
+            sorted(item.item_id for item in engine.session_items),
             ['cows-1', 'horse-1'],
         )
 
@@ -88,7 +88,7 @@ class EngineTestCase(unittest.TestCase):
 
         engine = Engine(str(csv_path), None, None, None, None)
         item = engine.session_items[0]
-        item_id = item['item_id']
+        item_id = item.item_id
 
         engine.record_result(item, True, 2.5)
         engine.record_result(item, True, 2.0)
@@ -96,12 +96,12 @@ class EngineTestCase(unittest.TestCase):
         follow_up_engine = Engine(str(csv_path), None, None, None, None)
         persisted_item = next(
             session_item for session_item in follow_up_engine.session_items
-            if session_item['item_id'] == item_id
+            if session_item.item_id == item_id
         )
 
-        self.assertEqual(persisted_item['current_stage'], 1)
-        self.assertGreater(persisted_item['progress']['mastery_score'], 0.0)
-        self.assertIsNotNone(persisted_item['progress']['next_due_at'])
+        self.assertEqual(persisted_item.current_stage, 1)
+        self.assertGreater(persisted_item.progress.mastery_score, 0.0)
+        self.assertIsNotNone(persisted_item.progress.next_due_at)
 
 
 if __name__ == '__main__':
