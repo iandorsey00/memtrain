@@ -7,3 +7,15 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["memtrain*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
